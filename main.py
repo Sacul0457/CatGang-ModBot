@@ -53,38 +53,4 @@ class ModBot(commands.Bot):
         await super().close()
 bot = ModBot()
 
-
-
-@bot.command()
-async def fetch(ctx:commands.Context, member_or_case : discord.User | str):
-    if isinstance(member_or_case, discord.User):
-        async with bot.mod_pool.acquire() as conn:
-            row = await conn.execute('''SELECT case_id, action, mod_id FROM moddb WHERE user_id =?''',
-                               (member_or_case.id,))
-            result = await row.fetchall()
-        if result is None:
-            return await ctx.send(f"{member_or_case} has no cases!")
-        elif isinstance(result, list):
-            data_list = "\n- ".join([f"Case: `{item['case_id']}`, Action: {item['action']}, Mod: `{item['mod_id']}`" for item in result])
-            await ctx.send(f"- {data_list}")
-
-        else:
-            case_id = result["case_id"]
-            action = result["action"]
-            mod_id = result["mod_id"]
-            await ctx.send(f"Case: `{case_id}`\nAction: {action}\nMod ID: `{mod_id}`")
-    elif isinstance(member_or_case, str):
-        async with bot.mod_pool.acquire() as conn:
-            row = await conn.execute('''SELECT user_id, action, mod_id FROM moddb WHERE case_id =?''',
-                               (member_or_case,))
-            result = await row.fetchone()
-        if result:
-            user_id = result["user_id"]
-            action = result["action"]
-            mod_id = result["mod_id"]
-            await ctx.send(f"User_id: `{user_id}`\nAction: {action}\nMod ID: `{mod_id}`")
-        else:
-            await ctx.send(f"No such case: `{member_or_case}`!")
-
-
 bot.run(TOKEN)
