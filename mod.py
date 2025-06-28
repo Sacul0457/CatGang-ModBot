@@ -472,29 +472,82 @@ class ModCog(commands.Cog):
     async def caselist_user(self, ctx:commands.Context, user:discord.User):
         async with self.bot.mod_pool.acquire() as conn:
             rows = await conn.execute('''SELECT case_id, action, mod_id, time FROM moddb WHERE user_id = ?
-                                      ORDER BY time ASC''',
+                                      ORDER BY time DESC''',
                                       (user.id,))
             results = await rows.fetchall()
         if results:
-            data = "\n".join([f"- **{result["action"].capitalize()}** by <@{result["mod_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results])
-            if len(results) < 5:
+            if len(results) < 16:
+                data = "\n".join([f"- **{result["action"].capitalize()}** by <@{result["mod_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results])
+            
                 embed = discord.Embed(title=f"Case info",
                                     description=f">>> {data}",
                                     color=discord.Color.blurple())
                 embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
                 await ctx.send(embed=embed)
             else:
-                '''This part is still not finished'''
-                num_of_pages =  (len(results) + 4) // 5
-                embeds = [discord.Embed(title="Caseinfo",
-                                        description=f">>> {data}") for _ in range(num_of_pages)]
-                embeds
+                results_per_page = 15
+                data = [f"- **{result["action"].capitalize()}** by <@{result["mod_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results]
+                embeds = [
+                    discord.Embed(
+                        title="Case Info",
+                        description=f">>> {'\n'.join(data[i:i + results_per_page])}"
+                    ).set_author(name=f"@{user}", icon_url=user.display_avatar.url)
+                    for i in range(0, len(results), results_per_page)] 
                 paginator = ButtonPaginator(embeds)
                 await paginator.start(ctx.channel)
         else:
             embed = discord.Embed(title=f"❌ No cases found for @{user}")
             await ctx.send(embed=embed)
-async def setup(bot:commands.Bot):
+
+    @caselist.command(name="mod")
+    async def caselist_mod(self, ctx:commands.Context, mod:discord.User):
+        async with self.bot.mod_pool.acquire() as conn:
+            rows = await conn.execute('''SELECT case_id, user_id, action, time FROM moddb WHERE mod_id = ?
+                                      ORDER BY time DESC''',
+                                      (mod.id,))
+            results = await rows.fetchall()
+        if results:
+            if len(results) < 16:
+                data = "\n".join([f"- <@{result["user_id"]}> **{result["action"].capitalize()}** (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results])
+            
+                embed = discord.Embed(title=f"Case info",
+                                    description=f">>> {data}",
+                                    color=discord.Color.blurple())
+                embed.set_footer(text=f"@{mod}", icon_url=mod.display_avatar.url)
+                await ctx.send(embed=embed)
+            else:
+                results_per_page = 15
+                data = [f"- <@{result["user_id"]}> **{result["action"].capitalize()}** (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results]
+                embeds = [
+                    discord.Embed(
+                        title="Case Info",
+                        description=f">>> {'\n'.join(data[i:i + results_per_page])}"
+                    ).set_footer(text=f"@{mod}", icon_url=mod.display_avatar.url)
+                    for i in range(0, len(results), results_per_page)] 
+                paginator = ButtonPaginator(embeds)
+                await paginator.start(ctx.channel)
+        else:
+            embed = discord.Embed(title=f"❌ No cases found for moderator: @{mod}")
+            await ctx.send(embed=embed)
+
+    @commands.command(name="deletecase")
+    async def deletecase(self, ctx:commands.Context, case_id :str) -> None:
+        async with self.bot.mod_pool.acquire() as conn:
+            row = await conn.execute('''SELECT NULL FROM moddb WHERE case_id = ?''',
+                               (case_id,))
+            result = await row.fetchone()
+            if result:
+                await conn.execute('''DELETE FROM moddb WHERE case_id  =?''',
+                                   (case_id,))
+        if result:
+            embed = discord.Embed(title=f"✅ Successfully deleted case `{case_id}`",
+                                  color=discord.Color.brand_green())
+        else:
+            embed = discord.Embed(title=f"❌ There is no such case_id `{case_id}`",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
+            
+async def setup(bot:commands.Bot): 
     await bot.add_cog(ModCog(bot))
 
 class MassView(discord.ui.View):
