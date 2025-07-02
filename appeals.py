@@ -1,3 +1,4 @@
+import discord
 class FeedbackModal(discord.ui.Modal, title="Meowderator Form"):
     name = discord.ui.TextInput(label="Your Name", placeholder="John Doe", required=True)
     whywanna = discord.ui.TextInput(label="Why you wanna appeal for this?", style=discord.TextStyle.paragraph, required=True)
@@ -17,7 +18,5 @@ class FeedbackModal(discord.ui.Modal, title="Meowderator Form"):
 
 class FeedbackButton(discord.ui.View):
     @discord.ui.button(label="Meowderator Form", style=discord.ButtonStyle.primary, custom_id="meow_form_button")
-    async def open_modal(persistent_view, self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(FeedbackModal())
-
-persistent_view = FeedbackButton()
