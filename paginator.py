@@ -1,3 +1,5 @@
+#Thanks to soheab_ for developing this panginator :3
+
 from __future__ import annotations
 from typing import (
     Dict,
