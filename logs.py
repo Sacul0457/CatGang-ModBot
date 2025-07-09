@@ -5,8 +5,8 @@ import datetime
 import time
 import timeit
 import json
-MOD_LOG =  1294290963971178587 #1350425247471636530
-MANAGEMENT = 1327459358141054989 #1350425247471636530 
+MOD_LOG =  1350425247471636530  
+MANAGEMENT =1350425247471636530 
 
 class LogCogs(commands.Cog):
     def __init__(self, bot:commands.Bot):
@@ -14,7 +14,7 @@ class LogCogs(commands.Cog):
 
     @commands.Cog.listener("on_message_delete")
     async def message_delete_listener(self, message:discord.Message):
-        if message.author.id == 1389603306997026857:
+        if message.author.id == self.bot.user.id:
             return
         embed = discord.Embed(title="Message Deleted",
                               description=f"> **User:** {message.author.mention} ({message.author.id})\n> **Channel:** {message.channel.mention}\
@@ -68,11 +68,10 @@ class LogCogs(commands.Cog):
     @commands.Cog.listener("on_member_update")
     async def member_update_listener(self, before_member:discord.Member, after_member:discord.Member):
         if before_member.roles != after_member.roles:
- 
-            role_added : list[discord.Role] = [role for role in after_member.roles if role not in before_member.roles and role != after_member.guild.default_role]
-            if role_added:
+            if len(after_member.roles) > len(before_member.roles):
+                role_added : list[discord.Role] = [role for role in after_member.roles if role not in before_member.roles and role != after_member.guild.default_role]
                 embed = discord.Embed(title="Role Added",
-                                      description=f"{after_member.mention} has been given the {role_added[0].mention} role.",
+                                      description=f"{after_member.mention} has been given the {role_added[0].mention if len(role_added) <1 else ", ".join(f"{role_added[i].mention}" for i in range(len(role_added)))} role.",
                                       color=discord.Color.brand_green(),
                                       timestamp=discord.utils.utcnow())
                 embed.set_author(name=f"@{after_member}", icon_url=after_member.display_avatar.url)
@@ -84,7 +83,7 @@ class LogCogs(commands.Cog):
             else:
                 role_removed : list[discord.Role] = [role for role in after_member.roles if role in before_member.roles and role != after_member.guild.default_role]
                 embed = discord.Embed(title="Role Removed",
-                                      description=f"{after_member.mention} has been removed from the {role_removed[0].mention} role.",
+                                      description=f"{after_member.mention} has been removed from the {role_removed[0].mention if len(role_removed) <1 else ", ".join(role_removed[i] for i in range(len(role_removed)))} role",
                                       color=discord.Color.brand_red(),
                                       timestamp=discord.utils.utcnow())
                 embed.set_author(name=f"@{after_member}", icon_url=after_member.display_avatar.url)
@@ -211,10 +210,14 @@ class LogCogs(commands.Cog):
                     break
             channel = self.bot.get_channel(MANAGEMENT)
             await channel.send(embeds=[embedafter, embedbefore])
-
+        elif before_role.name != after_role.name:
+            embed = discord.Embed(title="Role Name Change ",
+                                       description=f">>> **Role:** {after_role.mention}\n**New:** `@{after_role}`\n**Old:** `@{before_role}`",
+                                       timestamp=discord.utils.utcnow(),
+                                       color=after_role.color)
     @commands.Cog.listener("on_guild_channel_create")
     async def guild_channel_create_listener(self, channel:discord.abc.GuildChannel):
-        if isinstance(channel, discord.ChannelType.category):
+        if isinstance(channel, discord.CategoryChannel):
             embed = discord.Embed(title="Category Created",
                                 description=f"A new category `{channel}` has been created.",
                                 timestamp=discord.utils.utcnow(),
@@ -239,7 +242,7 @@ class LogCogs(commands.Cog):
 
     @commands.Cog.listener("on_guild_channel_delete")
     async def guild_channel_delete_listener(self, channel:discord.abc.GuildChannel):
-        if isinstance(channel, discord.ChannelType.category):
+        if isinstance(channel, discord.CategoryChannel):
             embed = discord.Embed(title="Category Deleted",
                                 description=f"The category `{channel}` has been deleted.",
                                 timestamp=discord.utils.utcnow(),
@@ -264,7 +267,7 @@ class LogCogs(commands.Cog):
 
     @commands.Cog.listener("on_guild_channel_update")
     async def guild_channel_update_listener(self, before_channel:discord.abc.GuildChannel, after_channel:discord.abc.GuildChannel):
-        if not isinstance(after_channel, discord.ChannelType.category):
+        if not isinstance(after_channel, discord.CategoryChannel):
             if before_channel.name != after_channel.name:
                 embed = discord.Embed(title="Channel Name Change",
                                     description=f">>> **Channel:** {after_channel.mention} ({after_channel.id})\n**New:** `{after_channel.name}`\
@@ -333,6 +336,8 @@ class LogCogs(commands.Cog):
                     mod = guild.get_member(entry.user_id) or await guild.fetch_member(entry.user_id)
                     embed.set_footer(text=f"Updated by @{mod}", icon_url=mod.display_avatar.url)
             embed.set_thumbnail(url=new_emoji.url)
+            channel = guild.get_channel(MOD_LOG)
+            await channel.send(embed=embed)
         else:
             before_list = {emoji for emoji in before}
             after_list = {emoji for emoji in after}
@@ -349,6 +354,8 @@ class LogCogs(commands.Cog):
                     if entry.target.id == emoji.id:
                         mod = guild.get_member(entry.user_id) or await guild.fetch_member(entry.user_id)
                         embed.set_footer(text=f"Created by @{mod}", icon_url=mod.display_avatar.url)
+                channel = guild.get_channel(MOD_LOG)
+                await channel.send(embed=embed)
             else:
                 emoji : discord.Emoji = list(removed)[0]
                 embed = discord.Embed(title="Emoji Deleted",
@@ -361,8 +368,9 @@ class LogCogs(commands.Cog):
                     if entry.target.id == emoji.id:
                         mod = guild.get_member(entry.user_id) or await guild.fetch_member(entry.user_id)
                         embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
-        channel = guild.get_channel(MOD_LOG)
-        await channel.send(embed=embed)
-            
+                channel = guild.get_channel(MOD_LOG)
+                await channel.send(embed=embed)
+
+
 async def setup(bot:commands.Bot):
     await bot.add_cog(LogCogs(bot))
