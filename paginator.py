@@ -1,5 +1,3 @@
-#Thanks to soheab_ for developing this panginator :3
-
 from __future__ import annotations
 from typing import (
     Dict,
@@ -159,9 +157,8 @@ class ButtonPaginator(Generic[PageT_co], discord.ui.View):
             if self.message is not None:
                 await self.message.delete()
         else:
-            await interaction.response.send_message("Stopped the paginator.")
-
-        self.stop()
+            await interaction.response.send_message("The caselist button has stopped.", ephemeral=True)
+        await interaction.message.edit(view=None)
 
     def reset_files(self, page_kwargs: dict[str, Any]) -> None:
         files: List[discord.File] = page_kwargs.get("files", [])
