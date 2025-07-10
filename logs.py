@@ -83,7 +83,7 @@ class LogCogs(commands.Cog):
             else:
                 role_removed : list[discord.Role] = [role for role in after_member.roles if role in before_member.roles and role != after_member.guild.default_role]
                 embed = discord.Embed(title="Role Removed",
-                                      description=f"{after_member.mention} has been removed from the {role_removed[0].mention if len(role_removed) <1 else ", ".join(role_removed[i] for i in range(len(role_removed)))} role",
+                                      description=f"{after_member.mention} has been removed from the {role_removed[0].mention if len(role_removed) <1 else ", ".join(f"{role_removed[i].mention}" for i in range(len(role_removed)))} role",
                                       color=discord.Color.brand_red(),
                                       timestamp=discord.utils.utcnow())
                 embed.set_author(name=f"@{after_member}", icon_url=after_member.display_avatar.url)
@@ -370,7 +370,6 @@ class LogCogs(commands.Cog):
                         embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
                 channel = guild.get_channel(MOD_LOG)
                 await channel.send(embed=embed)
-
-
+            
 async def setup(bot:commands.Bot):
     await bot.add_cog(LogCogs(bot))
