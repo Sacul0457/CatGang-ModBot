@@ -1,4 +1,4 @@
-# ABC-Mod-Bot
+# CatGangMod Bot
 A python moderation bot for the cat gang server: https://discord.gg/cat-gang-1319213192064536607
 
 # Self-Hosting
