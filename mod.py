@@ -35,7 +35,11 @@ class ModCog(commands.Cog):
     async def warn(self, ctx:commands.Context, member:discord.Member,  *, reason:str="No reason provided."):
         await ctx.message.delete()
         if member.top_role >= ctx.author.top_role:
-            return await ctx.send(f"You cannot warn a member who's role is higher or equal to yours.")
+            embed = discord.Embed(title="Insufficient Permissions",
+                                  description=f"- You cannot warn a member who's role is higher than or equal to yours.",
+                                  color=discord.Color.brand_red())
+            return await ctx.send(embed=embed)
+        
         case_id = convert_to_base64()
         user_embed = discord.Embed(title="You have been warned",
                             description=f">>> **Reason:** {reason}",
@@ -65,8 +69,24 @@ class ModCog(commands.Cog):
             await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                (case_id, member.id, "warn", ctx.author.id, time.time()))
             await conn.commit()
-
-
+    @warn.error
+    async def warn_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!warn [user] [reason]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
+            
     @tasks.loop(minutes=1)
     async def auto_unban(self):
         async with self.bot.mod_pool.acquire() as conn:
@@ -124,12 +144,19 @@ class ModCog(commands.Cog):
         await ctx.message.delete()
         if isinstance(member, discord.Member):
             if member.top_role >= ctx.author.top_role:
-                return await ctx.send(f"You cannot ban a member who's role is higher or same as yours.", delete_after=5)
+                embed = discord.Embed(title="Insufficient Permissions",
+                                    description=f"- You cannot ban a member who's role is higher than or equal to yours.",
+                                    color=discord.Color.brand_red())
+                return await ctx.send(embed=embed)
+            
         elif isinstance(member, discord.User):
             async for entry in ctx.guild.bans():
                 if entry.user.id == member.id:
-                    await ctx.send(f"{member.mention} is already banned!", delete_after=5)
-                    return
+                        embed = discord.Embed(title="Already Banned",
+                                        description=f"- {member.mention} is already banned.",
+                                        color=discord.Color.brand_red())
+                        return await ctx.send(embed=embed)
+                    
         total_seconds = None
         if duration != "Permanent":
             if duration.endswith(("s", "m", "h", "d")) and any(num in duration for num in NUMBERS):
@@ -203,25 +230,37 @@ class ModCog(commands.Cog):
         if total_seconds:
             self.auto_unban.start() if not self.auto_unban.is_running() else self.auto_unban.restart()
 
+    @ban.error
+    async def ban_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!ban [user] [duration] [reason]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return  
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
     @commands.command()
     @commands.has_any_role(*ADMIN, SENIOR, SACUL)
     async def unban(self, ctx:commands.Context, user:discord.User, *, reason:str="No reason provided."):
         await ctx.message.delete()
         bans = [entry.user.id async for entry in ctx.guild.bans()]
         if user.id not in bans:
-            return await ctx.send(f"{user} is not banned!", delete_after=5.0)
+            embed = discord.Embed(title="User Not Banned",
+                                description=f"- {user.mention} is not banned.",
+                                    color=discord.Color.brand_red())
+            return await ctx.send(embed=embed)
         try:
             await ctx.guild.unban(user, reason=f"Unbanned by {ctx.author} for: {reason}")
         except discord.Forbidden as e:
-            return await ctx.send(f"<@802167689011134474> An error occurred: {e}")
+            embed = discord.Embed(title="An Error Occurred ",
+                                  description=f"- {e}",
+                                    color=discord.Color.brand_red())
+            return await ctx.send(embed=embed)
 
-        user_embed = discord.Embed(title="You have been ubanned",
-                            description=f">>>**Reason:** {reason}",
-                                timestamp=discord.utils.utcnow(),
-                                color=discord.Color.brand_green())
-        
-        user_embed.set_author(name=ctx.guild.name, icon_url=ctx.guild.icon.url)
-        user_embed.set_thumbnail(url=ctx.guild.icon.url)
         case_id = convert_to_base64()
         channel = ctx.guild.get_channel(MOD_LOG)
         embed = discord.Embed(title=f"Unbanned (`{case_id}`)",
@@ -246,13 +285,32 @@ class ModCog(commands.Cog):
             await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                (case_id, user.id, "unban", ctx.author.id, time.time()))
             await conn.commit()
-
+    @unban.error
+    async def unban_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!unban [user] [reason]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.UserNotFound):
+            embed = discord.Embed(title="User Not Found",
+                                  description=f"- `{error.argument}` is not a user.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
     @commands.command()
     @commands.has_any_role(*ADMIN, SACUL, SENIOR)
     async def kick(self, ctx:commands.Context, member:discord.Member,  *, reason:str="No reason provided."):
         await ctx.message.delete()
         if member.top_role >= ctx.author.top_role:
-            return await ctx.send(f"You cannot kick a member who's role is higher or equal to yours.")
+            embed = discord.Embed(title="Insufficient Permissions",
+                                description=f"- You cannot kick a member who's role is higher than or equal to yours.",
+                                color=discord.Color.brand_red())
+            return await ctx.send(embed=embed)
         case_id = convert_to_base64()
 
         user_embed = discord.Embed(title="You have been kicked",
@@ -270,7 +328,10 @@ class ModCog(commands.Cog):
         try:
             await ctx.guild.kick(member, reason=f"Kicked by {ctx.author} for {reason}")
         except discord.Forbidden as e:
-            return await ctx.send(f"An error occurred: {e}")
+            embed = discord.Embed(title="An Error Occurred",
+                                description=f"- {e}",
+                                    color=discord.Color.brand_red())
+            return await ctx.send(embed=embed)
         channel = ctx.guild.get_channel(MOD_LOG) or await ctx.guild.fetch_channel(MOD_LOG)
         embed = discord.Embed(title=f"Kicked (`{case_id}`)",
                             description=f">>> **User:** {member.mention} ({member.id})\
@@ -287,15 +348,37 @@ class ModCog(commands.Cog):
             await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                             (case_id, member.id, "kick", ctx.author.id, time.time()))
             await conn.commit()
-
+    @kick.error
+    async def kick_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!kick [user] [reason]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
     @commands.command()
     @commands.has_any_role(*ADMIN, SENIOR, MODERATOR, SACUL)
     async def mute(self, ctx:commands.Context, member:discord.Member, duration:str, *, reason:str="No reason provided."):
         await ctx.message.delete()
         if member.top_role >= ctx.author.top_role:
-            return await ctx.send(f"You cannot mute a member who's role is higher or equal to yours.", delete_after=5.0)
+                embed = discord.Embed(title="Insufficient Permissions",
+                                    description=f"- You cannot mute a member who's role is higher than or equal to yours.",
+                                    color=discord.Color.brand_red())
+                return await ctx.send(embed=embed)
         elif member.guild_permissions.administrator:
-            return await ctx.send(f"You cannot mute an admin!", delete_after=5.0)
+                embed = discord.Embed(title="Insufficient Permissions",
+                                    description=f"- You mute an admin.",
+                                    color=discord.Color.brand_red())
+                return await ctx.send(embed=embed)
         td = datetime.timedelta()
         duration_list = [duration for duration in duration.split(",")]
         for duration in duration_list:
@@ -328,7 +411,10 @@ class ModCog(commands.Cog):
         try:
             await member.timeout(td, reason=f"Muted by {ctx.author} for: {reason}")
         except discord.Forbidden as e:
-            return await ctx.send(f"<@802167689011134474> An error occurred: {e}")
+            embed = discord.Embed(title="An Error Occurred",
+                                description=f"- {e}",
+                                    color=discord.Color.brand_red())
+            return await ctx.send(embed=embed)
         case_id = convert_to_base64()
         duration_message_parts = []
         if days > 0:
@@ -368,19 +454,44 @@ class ModCog(commands.Cog):
             await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                (case_id, member.id, "mute", ctx.author.id, time.time()))
             await conn.commit()
-
+    @mute.error
+    async def mute_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!mute [user] [duration] [reason]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
     @commands.command()
     @commands.has_any_role(*ADMIN, SENIOR, MODERATOR, SACUL)
     async def unmute(self, ctx:commands.Context, member:discord.Member, *, reason:str="No reason provided."):
         await ctx.message.delete()
         if member.top_role >= ctx.author.top_role:
-            return await ctx.send(f"You cannot unmute a member who's role is higher or equal to yours.", delete_after=5.0)
+                embed = discord.Embed(title="Insufficient Permissions",
+                                    description=f"- You cannot unmute a member who's role is higher than or equal to yours.",
+                                    color=discord.Color.brand_red())
+                return await ctx.send(embed=embed)
         elif not member.is_timed_out():
-            return await ctx.send(f"{member} is not timed out!", delete_after=5.0)
+                embed = discord.Embed(title="Member Not Muted",
+                                    description=f"- {member.mention} is not muted.",
+                                    color=discord.Color.brand_red())
+                return await ctx.send(embed=embed)
         try:
             await member.timeout(None, reason=f"Unmuted by {ctx.author} for reason: {reason}")
         except discord.Forbidden as e:
-            return await ctx.send(f"<@802167689011134474> An error occurred: {e}")
+            embed = discord.Embed(title="An error Occurred",
+                                description=f"- {e}",
+                                color=discord.Color.brand_red())
+            return await ctx.send(embed=embed)
 
         user_embed = discord.Embed(title="You have been unmuted",
                             description=f">>>**Reason:** {reason}",
@@ -411,6 +522,23 @@ class ModCog(commands.Cog):
             await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                (case_id, member.id, "unmute", ctx.author.id, time.time()))
             await conn.commit()
+    @unmute.error
+    async def unmute_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!unmute [user] [reason]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
 
     @commands.group(name="clean", invoke_without_command=True)
     async def clean(self, ctx:commands.Context, limit : int, channel : discord.TextChannel | None = None) -> None:
@@ -424,6 +552,23 @@ class ModCog(commands.Cog):
                               color=discord.Color.brand_green())
         await channel.send(embed=embed, delete_after=5)
 
+    @clean.error
+    async def clean_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!clean [limit] [channel]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.ChannelNotFound):
+            embed = discord.Embed(title="Channel Not Found",
+                                  description=f"- `{error.argument}` is not a channel.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
 
     @clean.command(name="until")
     async def clean_until(self, ctx:commands.Context, until : str, channel :discord.TextChannel | None = None):
@@ -438,6 +583,23 @@ class ModCog(commands.Cog):
                               color=discord.Color.brand_green())
         await channel.send(embed=embed, delete_after=5)
 
+    @clean_until.error
+    async def cleanuntil_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!clean until [msg] [channel]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.ChannelNotFound):
+            embed = discord.Embed(title="Channel Not Found",
+                                  description=f"- `{error.argument}` is not a channel.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
     @clean.command(name="between")
     async def clean_between(self, ctx:commands.Context, first_message : str | int, second_message :str | int,  channel :discord.TextChannel | None = None):
         await ctx.message.delete()
@@ -455,6 +617,23 @@ class ModCog(commands.Cog):
                               color=discord.Color.brand_green())
         await channel.send(embed=embed, delete_after=5)
 
+    @clean_between.error
+    async def cleanbetween_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!clean between [msg1] [msg2] [channel]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.ChannelNotFound):
+            embed = discord.Embed(title="Channel Not Found",
+                                  description=f"- `{error.argument}` is not a channel.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
 
     @commands.group(name="slowmode")
     @commands.has_any_role(*ADMIN, SACUL)
@@ -527,16 +706,95 @@ class ModCog(commands.Cog):
         embed.set_footer(text=f"@{ctx.author}", icon_url=ctx.author.display_avatar.url)
         await channel.send(embed=embed)
 
+    @slowmode.error
+    async def slowmmode_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!slowmode [duration] [channel]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.ChannelNotFound):
+            embed = discord.Embed(title="Channel Not Found",
+                                  description=f"- `{error.argument}` is not a channel.",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
+
+    @commands.command(name="masskick")
+    @commands.has_any_role(*ADMIN, SENIOR, SACUL)
+    async def masskick(self, ctx:commands.Context, *members:discord.Member):
+        await ctx.message.delete()
+        embed = discord.Embed(title="Masskick",
+                              description="Are you sure you want to execute this?",
+                              color=discord.Color.brand_red())
+        view = MassView(set(members), "masskick", self.bot, ctx.author.id)
+        await ctx.send(embed=embed, view=view)
+
+    @masskick.error
+    async def masskick_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!masskick [users]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
+
     @commands.command(name="massban")
     @commands.has_any_role(*ADMIN, SENIOR, SACUL)
-    async def massban(self, ctx:commands.Context, *users:discord.Object):
+    async def massban(self, ctx:commands.Context, *users:discord.Member | discord.User):
         await ctx.message.delete()
         embed = discord.Embed(title="Massban",
                               description="Are you sure you want to execute this?",
                               color=discord.Color.brand_red())
-        users = {user.id for user in set(users)}
-        view = MassView(users, "massban", self.bot, ctx.author.id)
+        users_list = []
+        for user in set(users):
+            if isinstance(user, discord.Member):
+                if user.top_role >= ctx.author.top_role:
+                    continue
+            users_list.append(user.id)
+        if not users_list:
+            embed = discord.Embed(title="An error occurred",
+                                  description=f"You are unable to ban all the members given.",
+                                  color=discord.Color.brand_red())
+            await ctx.send(embed=embed, delete_after=10.0)
+            return
+        view = MassView(users_list, "massban", self.bot, ctx.author.id)
         await ctx.send(embed=embed, view=view)
+
+    @massban.error
+    async def massban_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!massban [users]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.UserNotFound):
+            embed = discord.Embed(title="User Not Found",
+                                  description=f"- `{error.argument}` is not a user.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
 
     @commands.command(name="massmute")
     @commands.has_any_role(*ADMIN, SENIOR, SACUL)
@@ -548,6 +806,24 @@ class ModCog(commands.Cog):
         view = MassView(set(users), "massmute", self.bot, ctx.author.id)
         await ctx.send(embed=embed, view=view)
 
+    @massmute.error
+    async def massmute_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!massmute [users]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
+
     @commands.command(name="massunban")
     @commands.has_any_role(*ADMIN, SENIOR, SACUL)
     async def massunban(self, ctx:commands.Context, *users:discord.Object):
@@ -558,6 +834,19 @@ class ModCog(commands.Cog):
         users = {user.id for user in set(users)}
         view = MassView(users, "massunban", self.bot, ctx.author.id)
         await ctx.send(embed=embed, view=view)
+    @massunban.error
+    async def massunban_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!massunban [users]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
 
     @commands.command(name="case", aliases=["modlogs"])
     @commands.has_any_role(*ADMIN, MODERATOR, SENIOR, SACUL)
@@ -586,16 +875,36 @@ class ModCog(commands.Cog):
             embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
             embed.set_footer(text=f"Mod: @{mod} ({mod.id})", icon_url=mod.display_avatar.url)
         await ctx.send(embed=embed)
-    
+    @case.error
+    async def case_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!case [case_id]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        else:
+            embed = discord.Embed(
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
     @commands.group(name="caselist")
     @commands.has_any_role(*ADMIN, SACUL, SENIOR, MODERATOR)
     async def caselist(self, ctx:commands.Context):
         if ctx.invoked_subcommand is None:
-            embed = discord.Embed(title="❌ Invalid Input",
-                                  description=f"Example:\
-                                    \n>>> - !caselist user @user\n- !caselist mod @user",
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f">>> - `!caselist user [user]`\n- `!caselist mod [user]`",
                                     color=discord.Color.brand_red())
             await ctx.send(embed=embed)
+    @caselist.error
+    async def caselist_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingAnyRole):
+            return
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
     @caselist.command(name="user")
     async def caselist_user(self, ctx:commands.Context, user:discord.User):
         async with self.bot.mod_pool.acquire() as conn:
@@ -617,7 +926,7 @@ class ModCog(commands.Cog):
                 data = [f"- **{result["action"].capitalize()}** by <@{result["mod_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results]
                 embeds = [
                     discord.Embed(
-                        title="Case Info",
+                        title="Case list",
                         description=f">>> {'\n'.join(data[i:i + results_per_page])}"
                     ).set_author(name=f"@{user} ({user.id})", icon_url=user.display_avatar.url)
                     for i in range(0, len(results), results_per_page)] 
@@ -626,7 +935,27 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(title=f"❌ No cases found for @{user}")
             await ctx.send(embed=embed)
-
+    @caselist_user.error
+    async def caselistuser_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!caselist user [user]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.UserNotFound):
+            embed = discord.Embed(title="User Not Found",
+                                  description=f"- `{error.argument}` is not a user.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
     @caselist.command(name="mod")
     async def caselist_mod(self, ctx:commands.Context, mod:discord.User):
         async with self.bot.mod_pool.acquire() as conn:
@@ -636,9 +965,9 @@ class ModCog(commands.Cog):
             results = await rows.fetchall()
         if results:
             if len(results) < 15:
-                data = "\n".join([f"- <@{result["user_id"]}> **{result["action"].capitalize()}** (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results])
+                data = "\n".join([f"- **{result["action"].capitalize()}** <@{result["user_id"]}>  (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results])
             
-                embed = discord.Embed(title=f"Case info",
+                embed = discord.Embed(title=f"Case list",
                                     description=f">>> {data}",
                                     color=discord.Color.blurple())
                 embed.set_footer(text=f"Mod: @{mod} ({mod.id})", icon_url=mod.display_avatar.url)
@@ -657,6 +986,28 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(title=f"❌ No cases found for moderator: @{mod}")
             await ctx.send(embed=embed)
+
+    @caselist_mod.error
+    async def caselistmod_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!caselist mod [user]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.UserNotFound):
+            embed = discord.Embed(title="User Not Found",
+                                  description=f"- `{error.argument}` is not a user.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
 
     @commands.command(name="deletecase")
     async def deletecase(self, ctx:commands.Context, case_id :str) -> None:
@@ -680,7 +1031,21 @@ class ModCog(commands.Cog):
             embed = discord.Embed(title=f"❌ There is no such case_id `{case_id}`",
                                   color=discord.Color.brand_red())
         await ctx.send(embed=embed)
-            
+
+    @caselist_user.error
+    async def caselistuser_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!deletecase [case_id]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
+
 async def setup(bot:commands.Bot): 
     await bot.add_cog(ModCog(bot))
 
@@ -699,6 +1064,8 @@ class MassView(discord.ui.View):
             await interaction.response.send_modal(MassMuteModal(self.users, self.bot))
         elif self.action == "massunban":
             await interaction.response.send_modal(MassUnbanModal(self.users, self.bot))
+        elif self.action == "masskick":
+            await interaction.response.send_modal(MassKickModal(self.users, self.bot))
     
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red, custom_id="CancelMassPunish")
     async def callback2(self, interaction:discord.Interaction, button:discord.ui.Button):
@@ -710,8 +1077,10 @@ class MassView(discord.ui.View):
 class MassBanModal(discord.ui.Modal):
     def __init__(self, users: list[discord.Object], bot:commands.Bot):
         super().__init__(title="Massban", timeout=900, custom_id="Massban")
-        users_split = ",".join(str(user_id) for user_id in users)
-        self.users = discord.ui.TextInput(label="Users", default=users_split, required=True, min_length=18, max_length=1000,
+        self.actual_users = users
+        print(self.actual_users)
+        self.users_split = ",".join(str(user_id) for user_id in users)
+        self.users = discord.ui.TextInput(label="Users", default=self.users_split, required=True, min_length=18, max_length=1000,
                                                 style=discord.TextStyle.long)
         self.reason = discord.ui.TextInput(label="Reason", placeholder="The reason for the massban", default="No reason provided.",
                                            required=False, min_length=1, max_length=1000, style=discord.TextStyle.long)
@@ -721,9 +1090,22 @@ class MassBanModal(discord.ui.Modal):
     async def on_submit(self, interaction:discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(f"Now attempting to ban the users... This might take a while", ephemeral=True)
-        to_ban = [discord.Object(int(user_id)) for user_id in self.users.value.split(",")]
+        if self.users_split != self.users.value:
+            to_ban = []
+            for user_id in self.users.value.split(","):
+                try:
+                    member = interaction.guild.get_member(int(user_id)) or await interaction.guild.fetch_member(int(user_id))
+                    if member:
+                        if member.top_role >= interaction.user.top_role:
+                            continue
+                except discord.NotFound:
+                    pass
+                to_ban.append(discord.Object(user_id))
+        else:
+            print("No change")
+            to_ban = [discord.Object(user_id) for user_id in self.users.value.split(",")]
         try:
-            result = await interaction.guild.bulk_ban(to_ban, reason=f"Banned by {interaction.user} for {self.reason.value}")
+            result = await interaction.guild.bulk_ban(to_ban, reason=f"Banned by {interaction.user} for: {self.reason.value}")
             if result.banned:
                 banned  = []
                 insert_value = []
@@ -734,7 +1116,7 @@ class MassBanModal(discord.ui.Modal):
 
         except discord.HTTPException as e:
             return await interaction.followup.send(f"An error occurred: {e}")
-        response_embed = discord.Embed(title=f"{f"✅ Successfully massbanned {len(result.banned)}"}/{len(to_ban)} users" if result.banned else f"❌ Failed to massban all users.",
+        response_embed = discord.Embed(title=f"{f"✅ Successfully massbanned {len(result.banned)}"}/{len(self.users.value.split(","))} users" if result.banned else f"❌ Failed to massban all users.",
                                        color=discord.Color.brand_green() if result.banned else discord.Color.brand_red())
         await interaction.followup.send(embed=response_embed, ephemeral=True)
         await interaction.message.delete()
@@ -813,7 +1195,7 @@ class MassMuteModal(discord.ui.Modal):
 
         duration_message = ' and '.join(duration_message_parts)
         user_embed = discord.Embed(title="You have been muted",
-                                   description=f"**Duration:** {duration_message}\n**Reason:** {self.reason.value}",
+                                   description=f">>> **Duration:** {duration_message}\n**Reason:** {self.reason.value}",
                                    timestamp=discord.utils.utcnow(),
                                    color=discord.Color.brand_red())
         user_embed.set_author(name=interaction.guild.name, icon_url=interaction.guild.icon.url)
@@ -826,6 +1208,10 @@ class MassMuteModal(discord.ui.Modal):
                 except discord.NotFound:
                     continue
                 if member.is_timed_out():
+                    continue
+                if member.guild_permissions.administrator:
+                    continue
+                if member.top_role >= interaction.user.top_role:
                     continue
                 try:
                     await member.timeout(td, reason=f"Muted by {interaction.user} for: {self.reason.value}")
@@ -842,6 +1228,10 @@ class MassMuteModal(discord.ui.Modal):
         else:
             for user in self.actual_users:
                 if user.is_timed_out():
+                    continue
+                if user.top_role >= interaction.user.top_role:
+                    continue
+                if user.guild_permissions.administrator:
                     continue
                 try:
                     await user.timeout(td, reason=f"Muted by {interaction.user} for: {self.reason.value}")
@@ -919,3 +1309,74 @@ class MassUnbanModal(discord.ui.Modal):
                 async with conn.transaction():
                     await conn.executemany(f'''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                         (*insert_value,))
+                    
+class MassKickModal(discord.ui.Modal):
+    def __init__(self, users: list[discord.Member], bot:commands.Bot):
+        super().__init__(title="Masskick", timeout=900, custom_id="Masskick")
+        self.actual_users = users
+        self.users_split = ",".join(str(user.id) for user in users)
+        self.users = discord.ui.TextInput(label="Users", default=self.users_split, required=True, min_length=18, max_length=1000,
+                                                style=discord.TextStyle.long)
+        self.reason = discord.ui.TextInput(label="Reason", placeholder="The reason for the massban", default="No reason provided.",
+                                           required=False, min_length=1, max_length=1000, style=discord.TextStyle.long)
+        self.add_item(self.users)
+        self.add_item(self.reason)
+        self.bot =bot
+    async def on_submit(self, interaction:discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(f"Now attempting to kick the users... This might take a while", ephemeral=True)
+        user_embed = discord.Embed(title="You have been muted",
+                                   description=f">>> **Reason:** {self.reason.value}",
+                                   timestamp=discord.utils.utcnow(),
+                                   color=discord.Color.brand_red())
+        user_embed.set_author(name=interaction.guild.name, icon_url=interaction.guild.icon.url)
+        kicked = []
+        insert_value = []
+        if self.users_split != self.users.value:
+            for member_id in self.users.value.split(","):
+                try:
+                    member = interaction.guild.get_member(member_id) or await interaction.guild.fetch_member(member_id)
+                except discord.NotFound:
+                    continue
+                if member.top_role >= interaction.user.top_role:
+                    continue
+                try:
+                    await interaction.guild.kick(user, reason=f"Kicked by {interaction.user} for: {self.reason.value}")
+                except discord.Forbidden:
+                    continue
+                case_id = convert_to_base64()
+                kicked.append(f"{member.id} | `{case_id}`")
+                insert_value.append((case_id, member.id, "kick", interaction.user.id, time.time()))
+
+        else:
+            for user in self.actual_users:
+                if user.top_role >= interaction.user.top_role:
+                    continue
+                try:
+                    await interaction.guild.kick(user, reason=f"Kicked by {interaction.user} for: {self.reason.value}")
+                except discord.Forbidden:
+                    continue
+                case_id = convert_to_base64()
+                kicked.append(f"{user.id} | `{case_id}`")
+                insert_value.append((case_id, user.id, "kick", interaction.user.id, time.time()))
+        response_embed = discord.Embed(title=f"✅ Successfully masskicked {len(kicked)}/{len(self.users.value.split(","))}!" if kicked else f"❌ Failed to masskick all the users.",
+                                       color=discord.Color.brand_green() if kicked else discord.Color.brand_red())
+        await interaction.followup.send(embed=response_embed, ephemeral=True)
+        await interaction.message.delete()
+
+        if kicked:
+            channel = interaction.guild.get_channel(MOD_LOG)
+            embed = discord.Embed(title=f"Masskicked [{len(kicked)}]",
+                                description=f">>> - {"\n- ".join(kicked)}",
+                                color=discord.Color.brand_red(),
+                                timestamp=discord.utils.utcnow())
+            embed.add_field(name=f"Kicked by",
+                            value=f">>> {interaction.user.mention} ({interaction.user.id})", inline=False)
+            embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
+            await channel.send(embed=embed)
+
+            async with self.bot.mod_pool.acquire() as conn:
+                async with conn.transaction():
+                    await conn.executemany(f'''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
+                                        (*insert_value,))
+
