@@ -63,5 +63,8 @@ class ModBot(commands.Bot):
         await super().close()
 bot = ModBot()
 
+@bot.event
+async def on_command_error(ctx:commands.context, error:commands.CommandError):
+    pass
 
 bot.run(TOKEN)
