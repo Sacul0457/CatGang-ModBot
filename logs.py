@@ -81,7 +81,7 @@ class LogCogs(commands.Cog):
                         embed.set_footer(text=f"Added by @{mod}", icon_url=mod.display_avatar.url)
                         break
             else:
-                role_removed : list[discord.Role] = [role for role in after_member.roles if role in before_member.roles and role != after_member.guild.default_role]
+                role_removed : list[discord.Role] = [role for role in before_member.roles if role not in after_member.roles and role != after_member.guild.default_role]
                 embed = discord.Embed(title="Role Removed",
                                       description=f"{after_member.mention} has been removed from the {role_removed[0].mention if len(role_removed) <1 else ", ".join(f"{role_removed[i].mention}" for i in range(len(role_removed)))} role",
                                       color=discord.Color.brand_red(),
