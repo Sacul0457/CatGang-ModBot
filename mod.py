@@ -26,7 +26,17 @@ class ModCog(commands.Cog):
     def __init__(self, bot:commands.Bot):
         self.bot = bot
 
-
+    @commands.command()
+    @commands.has_permissions(manage_nicknames=True)
+    async def reset_nickname(self, ctx, member: discord.Member):
+        try:
+            await member.edit(nick=None)
+            await ctx.send(f"Nickname reset for {member.mention}")
+        except discord.Forbidden:
+            await ctx.send("I don't have permission to change that user's nickname.")
+        except Exception as e:
+            await ctx.send(f"An error occurred: {e}")
+    
     @commands.command()
     @commands.has_any_role(*ADMIN, MODERATOR, SACUL, SENIOR)
     async def warn(self, ctx:commands.Context, member:discord.Member,  *, reason:str="No reason provided."):
@@ -779,21 +789,4 @@ class MassUnbanModal(discord.ui.Modal):
                 async with conn.transaction():
                     await conn.executemany(f'''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                         (*insert_value,))
-class Nickname(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
 
-    @commands.command(name="resetnick")
-    @commands.has_permissions(manage_nicknames=True)
-    async def reset_nickname(self, ctx, member: discord.Member):
-        try:
-            await member.edit(nick=None)
-            await ctx.send(f"Nickname reset for {member.mention}")
-        except discord.Forbidden:
-            await ctx.send("I don't have permission to change that user's nickname.")
-        except Exception as e:
-            await ctx.send(f"An error occurred: {e}")
-
-# Register the cog
-async def setup(bot):
-    await bot.add_cog(Nickname(bot))
