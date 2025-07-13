@@ -67,4 +67,41 @@ bot = ModBot()
 async def on_command_error(ctx:commands.context, error:commands.CommandError):
     pass
 
+@bot.group(name="cog")
+async def cog(ctx:commands.Context, cog:str) -> None:
+    if ctx.author.id != 802167689011134474:
+        return
+    if ctx.invoked_subcommand is None:
+        await ctx.send(f"You need to load, reload or unload.")
+@cog.command()
+async def load(ctx:commands.Context, cog:str) -> None:
+    if ctx.author.id != 802167689011134474:
+        return
+    await ctx.message.delete()
+    if cog not in cogs:
+        await ctx.send(f"You must choose from: {cogs}",
+                       delete_after=5.0)
+    await bot.load_extension(cog)
+
+@cog.command()
+async def reload(ctx:commands.Context, cog:str) -> None:
+    if ctx.author.id != 802167689011134474:
+        return
+    await ctx.message.delete()
+    if cog not in cogs:
+        await ctx.send(f"You must choose from: {cogs}",
+                       delete_after=5.0)
+    await bot.reload_extension(cog)
+
+@cog.command()
+async def unload(ctx:commands.Context, cog:str) -> None:
+    if ctx.author.id != 802167689011134474:
+        return
+    await ctx.message.delete()
+    if cog not in cogs:
+        await ctx.send(f"You must choose from: {cogs}",
+                       delete_after=5.0)
+    await bot.unload_extension(cog)
+
+
 bot.run(TOKEN)
