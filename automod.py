@@ -7,6 +7,7 @@ from uuid import uuid4
 import base64
 
 MOD_LOG =1350425247471636530  #1294290963971178587
+AUTOMOD_RULE = "not set"
 
 class AutomodCog(commands.Cog):
     def __init__(self, bot:commands.Bot):
@@ -17,7 +18,7 @@ class AutomodCog(commands.Cog):
         return base64.urlsafe_b64encode(u.bytes).rstrip(b'=').decode('ascii')
  
     def calc_last_executed(self) ->bool:
-        if time.time() - self.last_executed <= 10:
+        if time.time() - self.last_executed <= 7:
             return False
         self.last_executed = time.time()
         return True
@@ -59,7 +60,7 @@ class AutomodCog(commands.Cog):
                 user_embed.set_author(name=user.guild, icon_url=user.guild.icon.url)
                 user_embed.set_thumbnail(url=user.guild.icon.url)
                 try:
-                    await user.send(embed=user_embed)
+                    await user.send(embed=user_embed, view=AppealView())
                 except discord.Forbidden:
                     pass
             try:
@@ -197,5 +198,17 @@ class AutomodCog(commands.Cog):
                 await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                    (automod_case_id, user.id, action, self.bot.user.id, time.time()))
 
+    @commands.Cog.listener("on_automod_action")
+    async def automod_action_listener(self, action:discord.AutoModAction):
+        if action.rule_id == : AUTOMOD_RULE
+            await action.member.edit(nick="Change nickname to English")
+
+
+
 async def setup(bot:commands.Bot):
     await bot.add_cog(AutomodCog(bot))
+
+class AppealView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label="Appeal", style=discord.ButtonStyle.link, url="https://discord.gg/er2ErWNZjG"))
