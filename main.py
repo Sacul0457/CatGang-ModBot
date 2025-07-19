@@ -9,6 +9,7 @@ import asyncio
 import datetime
 import time
 import random
+from paginator import ButtonPaginator
 
 
 TOKEN = os.getenv("TOKEN")
