@@ -40,7 +40,8 @@ class LogCogs(commands.Cog):
             return
         embed = discord.Embed(title="Message Edited",
                               description=f">>> **User:** {after_edit.author.mention} ({after_edit.author.id})\n**Channel:** {after_edit.channel.mention}\
-                                \n**Sent:** <t:{int(after_edit.created_at.timestamp())}:R>",
+                                \n**Sent:** <t:{int(after_edit.created_at.timestamp())}:R>\
+                                \n**[Jump to Message]({after_edit.jump_url})**",
                                 color=discord.Color.orange(),
                                 timestamp=discord.utils.utcnow())
         embed.add_field(name="Before",
@@ -97,7 +98,7 @@ class LogCogs(commands.Cog):
         elif before_member.nick != after_member.nick:
             embed = discord.Embed(title="Nickname Change",
                                 description=f">>> **User:** {after_member.mention} ({after_member.id})\
-                                    \n**New:** {after_member.display_name}\n**Old:** {before_member.display_name}",
+                                    \n**New:** `{after_member.display_name}`\n**Old:** `{before_member.display_name}`",
                                     color=discord.Color.orange())
             embed.set_author(name=f"@{after_member}", icon_url=after_member.display_avatar.url)
             embed.set_thumbnail(url=after_member.display_avatar.url)
@@ -211,7 +212,7 @@ class LogCogs(commands.Cog):
             channel = self.bot.get_channel(MANAGEMENT)
             await channel.send(embeds=[embedafter, embedbefore])
         elif before_role.name != after_role.name:
-            embed = discord.Embed(title="Role Name Change ",
+            embed = discord.Embed(title="Role Name Changed",
                                        description=f">>> **Role:** {after_role.mention}\n**New:** `@{after_role}`\n**Old:** `@{before_role}`",
                                        timestamp=discord.utils.utcnow(),
                                        color=after_role.color)
@@ -269,7 +270,7 @@ class LogCogs(commands.Cog):
     async def guild_channel_update_listener(self, before_channel:discord.abc.GuildChannel, after_channel:discord.abc.GuildChannel):
         if not isinstance(after_channel, discord.CategoryChannel):
             if before_channel.name != after_channel.name:
-                embed = discord.Embed(title="Channel Name Change",
+                embed = discord.Embed(title="Channel Name Changed",
                                     description=f">>> **Channel:** {after_channel.mention} ({after_channel.id})\n**New:** `{after_channel.name}`\
                                         \n**Old:** `{before_channel.name}`",
                                         timestamp=discord.utils.utcnow(),
@@ -308,7 +309,7 @@ class LogCogs(commands.Cog):
                     }
         else:
             if before_channel.name != after_channel.name:
-                embed = discord.Embed(title="Category Name Change",
+                embed = discord.Embed(title="Category Name Changed",
                                     description=f">>> **New:** `{after_channel.name}`\
                                         \n**Old:** `{before_channel.name}`",
                                         timestamp=discord.utils.utcnow(),
