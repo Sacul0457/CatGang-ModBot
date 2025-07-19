@@ -29,7 +29,7 @@ class ModCog(commands.Cog):
     async def cog_load(self):
         self.auto_unban.start()
 
-    
+
     @commands.command()
     @commands.guild_only()
     @commands.has_any_role(*ADMIN, SENIOR, MODERATOR, SACUL)
@@ -151,13 +151,13 @@ class ModCog(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_any_role(*ADMIN, MODERATOR, SACUL, SENIOR)
-    async def unwarn(self, ctx:commands.Context, member:discord.Member,  *, reason:str="No reason provided."):
+    async def deletewarns(self, ctx:commands.Context, member:discord.Member,  *, reason:str="No reason provided."):
         await ctx.message.delete()
         if member.top_role >= ctx.author.top_role:
             embed = discord.Embed(title="Insufficient Permissions",
-                                  description=f"- You cannot unwarn a member who's role is higher than or equal to yours.",
+                                  description=f"- You cannot remove a member's warns who's role is higher than or equal to yours.",
                                   color=discord.Color.brand_red())
-            return await ctx.send(embed=embed)
+            #return await ctx.send(embed=embed)
         async with self.bot.mod_pool.acquire() as conn:
             rows = await conn.execute('''SELECT case_id FROM moddb WHERE user_id = ? AND action = ?''',
                                (member.id, "warn"))
@@ -169,8 +169,8 @@ class ModCog(commands.Cog):
                 return await ctx.send(embed=embed)
             case_ids =[result["case_id"] for result in results]
             case_id = convert_to_base64()
-            await conn.executemany(f'''DELETE FROM moddb WHERE case_id IN ({",".join("?" for i in range(len(case_ids)))})''',
-                                   (case_ids,))
+            await conn.execute(f'''DELETE FROM moddb WHERE case_id IN ({",".join("?" for _ in case_ids)})''',
+                               tuple(case_ids))
             await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                (case_id, member.id, "unwarn", ctx.author.id, time.time()))
 
@@ -204,11 +204,11 @@ class ModCog(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
         await channel.send(embed=embed)
 
-    @unwarn.error
+    @deletewarns.error
     async def unwarn_error(self, ctx:commands.Context, error:commands.CommandError):
         if isinstance(error, commands.MissingRequiredArgument):
             embed = discord.Embed(title="Invalid Input",
-                                  description=f"\n- `!unwarn [user] [reason]`",
+                                  description=f"\n- `!deletewarns [user] [reason]`",
                                     color=discord.Color.brand_red())
         elif isinstance(error, commands.MissingAnyRole):
             return
@@ -222,7 +222,7 @@ class ModCog(commands.Cog):
                                   color=discord.Color.brand_red())
         await ctx.send(embed=embed)
             
-    @tasks.loop(minutes=1)
+    @tasks.loop(seconds=30)
     async def auto_unban(self):
         async with self.bot.mod_pool.acquire() as conn:
             row= await conn.execute('''SELECT user_id, time FROM tempbandb
@@ -705,6 +705,7 @@ class ModCog(commands.Cog):
     @commands.group(name="clean", invoke_without_command=True)
     @commands.guild_only()
     async def clean(self, ctx:commands.Context, limit : int, channel : discord.TextChannel | None = None) -> None:
+        await ctx.message.delete()
         if limit > 800:
             return await ctx.send(f"You can only purge up to a limit of `800` messages.", delete_after=5.0)
         def check(msg:discord.Message):
@@ -777,7 +778,11 @@ class ModCog(commands.Cog):
         start = discord.utils.snowflake_time(int(first_message))
         end = discord.utils.snowflake_time(int(second_message))
         channel = channel or ctx.channel
-        purged = await channel.purge(after=end, before=start, check=check)
+        if start.timestamp() > end.timestamp():
+            purged = await channel.purge(after=end, before=start, check=check)
+        else:
+            purged = await channel.purge(after=start, before=end, check=check)
+
         embed = discord.Embed(title=f"✅ Successfully purged `{len(purged)}` messages from {ctx.channel.mention}",
                               color=discord.Color.brand_green())
         await channel.send(embed=embed, delete_after=5)
@@ -1027,7 +1032,8 @@ class ModCog(commands.Cog):
                                (case_id,))
             result = await row.fetchone()
         if result is None:
-            embed = discord.Embed(title=f"❌ No such case: `{case_id}`")
+            embed = discord.Embed(title=f"❌ No such case: `{case_id}`",
+                                  color=discord.Color.brand_red())
         else:
             try:
                 user = self.bot.get_user(result["user_id"]) or await self.bot.fetch_user(result["user_id"])
@@ -1044,6 +1050,7 @@ class ModCog(commands.Cog):
                                     \n**Created on:** <t:{timestamp}:f>",
                                     color=discord.Color.blurple())
             embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
+            embed.set_thumbnail(url=user.display_avatar.url)
             embed.set_footer(text=f"Mod: @{mod} ({mod.id})", icon_url=mod.display_avatar.url)
         await ctx.send(embed=embed)
     @case.error
@@ -1087,27 +1094,19 @@ class ModCog(commands.Cog):
                                       (user.id,))
             results = await rows.fetchall()
         if results:
-            if len(results) < 15:
-                data = "\n".join([f"- **{result["action"].capitalize()}** by <@{result["mod_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results])
-            
-                embed = discord.Embed(title=f"Case List",
-                                    description=f">>> {data}",
-                                    color=discord.Color.blurple())
-                embed.set_author(name=f"@{user} ({user.id})", icon_url=user.display_avatar.url)
-                await ctx.send(embed=embed)
-            else:
-                results_per_page = 15
-                data = [f"- **{result["action"].capitalize()}** by <@{result["mod_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results]
-                embeds = [
-                    discord.Embed(
-                        title="Case list",
-                        description=f">>> {'\n'.join(data[i:i + results_per_page])}"
-                    ).set_author(name=f"@{user} ({user.id})", icon_url=user.display_avatar.url)
-                    for i in range(0, len(results), results_per_page)] 
-                paginator = ButtonPaginator(embeds)
-                await paginator.start(ctx.channel)
+            results_per_page = 15
+            data = [f"- **{result["action"].capitalize()}** by <@{result["mod_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results]
+            embeds = [
+                discord.Embed(
+                    title="Case list",
+                    description=f">>> {'\n'.join(data[i:i + results_per_page])}"
+                ).set_author(name=f"@{user} ({user.id})", icon_url=user.display_avatar.url)
+                for i in range(0, len(results), results_per_page)] 
+            paginator = ButtonPaginator(embeds)
+            await paginator.start(ctx.channel)
         else:
-            embed = discord.Embed(title=f"❌ No cases found for @{user}")
+            embed = discord.Embed(title=f"❌ No cases found for @{user}",
+                                  color=discord.Color.brand_red())
             await ctx.send(embed=embed)
     @caselist_user.error
     async def caselistuser_error(self, ctx:commands.Context, error:commands.CommandError):
@@ -1140,15 +1139,6 @@ class ModCog(commands.Cog):
                                       (mod.id,))
             results = await rows.fetchall()
         if results:
-            if len(results) < 15:
-                data = "\n".join([f"- **{result["action"].capitalize()}** <@{result["user_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results])
-            
-                embed = discord.Embed(title=f"Case list",
-                                    description=f">>> {data}",
-                                    color=discord.Color.blurple())
-                embed.set_footer(text=f"Mod: @{mod} ({mod.id})", icon_url=mod.display_avatar.url)
-                await ctx.send(embed=embed)
-            else:
                 results_per_page = 15
                 data = [f"- **{result["action"].capitalize()}** <@{result["user_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:f>" for result in results]
                 embeds = [
@@ -1160,7 +1150,8 @@ class ModCog(commands.Cog):
                 paginator = ButtonPaginator(embeds)
                 await paginator.start(ctx.channel)
         else:
-            embed = discord.Embed(title=f"❌ No cases found for moderator: @{mod}")
+            embed = discord.Embed(title=f"❌ No cases found for moderator: @{mod}",
+                                  color=discord.Color.brand_red())
             await ctx.send(embed=embed)
 
     @caselist_mod.error
@@ -1189,6 +1180,7 @@ class ModCog(commands.Cog):
     @commands.guild_only()
     @commands.has_any_role(*ADMIN, SACUL)
     async def deletecase(self, ctx:commands.Context, case_id :str) -> None:
+        await ctx.message.delete()
         async with self.bot.mod_pool.acquire() as conn:
             row = await conn.execute('''SELECT NULL FROM moddb WHERE case_id = ?''',
                                (case_id,))
@@ -1200,9 +1192,10 @@ class ModCog(commands.Cog):
             embed = discord.Embed(title=f"✅ Successfully deleted case `{case_id}`",
                                   color=discord.Color.brand_green())
             log_embed = discord.Embed(title=f"Case deleted `{case_id}`",
-                                      description=f"Deleted by {ctx.author.mention}",
+                                      description=f"- Deleted by {ctx.author.mention} ({ctx.author.id})",
                                       color=discord.Color.brand_red(),
                                       timestamp=discord.utils.utcnow())
+            log_embed.set_footer(text=f"@{ctx.author}", icon_url=ctx.author.display_avatar.url)
             channel = ctx.guild.get_channel(MOD_LOG)
             await channel.send(embed=log_embed)
         else:
