@@ -1086,7 +1086,7 @@ class ModCog(commands.Cog):
         await ctx.send(embed=embed)
     @caselist.command(name="user")
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, SACUL)
+    @commands.has_any_role(*ADMIN, MODERATOR, SENIOR, SACUL)
     async def caselist_user(self, ctx:commands.Context, user:discord.User):
         async with self.bot.mod_pool.acquire() as conn:
             rows = await conn.execute('''SELECT case_id, action, mod_id, time FROM moddb WHERE user_id = ?
@@ -1131,7 +1131,7 @@ class ModCog(commands.Cog):
         await ctx.send(embed=embed)
     @caselist.command(name="mod")
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, SACUL)
+    @commands.has_any_role(*ADMIN, MODERATOR, SENIOR, SACUL)
     async def caselist_mod(self, ctx:commands.Context, mod:discord.User):
         async with self.bot.mod_pool.acquire() as conn:
             rows = await conn.execute('''SELECT case_id, user_id, action, time FROM moddb WHERE mod_id = ?
