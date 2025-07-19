@@ -226,7 +226,7 @@ class ModCog(commands.Cog):
     @tasks.loop(seconds=30)
     async def auto_unban(self):
         async with self.bot.mod_pool.acquire() as conn:
-            row= await conn.execute('''SELECT user_id, time FROM tempbandb
+            row= await conn.execute('''SELECT user_id, time, log_id FROM tempbandb
                                ORDER BY time ASC
                                LIMIT 1''')
             result = await row.fetchone()
@@ -241,6 +241,7 @@ class ModCog(commands.Cog):
         to_sleep_timestamp = result["time"]
         to_sleep = datetime.datetime.fromtimestamp(to_sleep_timestamp)
         await discord.utils.sleep_until(to_sleep)
+
         try:
             user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
         except discord.NotFound:
@@ -258,6 +259,7 @@ class ModCog(commands.Cog):
                                    (int(user_id,)))
                 await conn.commit()
             return
+        
         guild = self.bot.get_guild(GUILD_ID)
         try:
             await guild.unban(user, reason=f"Tempban Expired")
@@ -265,6 +267,7 @@ class ModCog(commands.Cog):
             return
         banned_on = case_data["time"]
         channel = self.bot.get_channel(MOD_LOG)
+        log_id = result["log_id"]
         case_id = convert_to_base64()
         embed = discord.Embed(title=f"Unbanned | Tempban Expired (`{case_id}`)",
                               description=f">>> **User:** {user.mention} ({user.id})\n**Case Id:** `{case_id}`\
@@ -274,7 +277,7 @@ class ModCog(commands.Cog):
         embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
         embed.set_footer(text=f"@{mod}", icon_url=mod.display_avatar.url)
         embed.set_thumbnail(url=user.display_avatar.url)
-        await channel.send(embed=embed)
+        await channel.send(embed=embed, view=PreviousCase(log_id))
         async with self.bot.mod_pool.acquire() as conn:
             await conn.execute('''DELETE FROM tempbandb WHERE user_id = ?''',
                                (user_id,))
@@ -366,16 +369,16 @@ class ModCog(commands.Cog):
         embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
         embed.set_footer(text=f"@{ctx.author}", icon_url=ctx.author.display_avatar.url)
         embed.set_thumbnail(url=member.display_avatar.url)
-        await channel.send(embed=embed)
+        log_message = await channel.send(embed=embed)
 
         async with self.bot.mod_pool.acquire() as conn:
             await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?) ''',
                                (case_id, member.id, f"{"ban" if not total_seconds else "tempban"}", ctx.author.id,  time.time()))
 
             if total_seconds:
-                await conn.execute('''INSERT INTO tempbandb (user_id, time) VALUES (?, ?)
-                                    ON CONFLICT(user_id) DO UPDATE SET time=excluded.time''',
-                                    (member.id, (td.total_seconds() + time.time())))
+                await conn.execute('''INSERT INTO tempbandb (user_id, time, log_id) VALUES (?, ?, ?)
+                                    ON CONFLICT(user_id) DO UPDATE SET time=excluded.time, log_id=excluded.log_id''',
+                                    (member.id, (td.total_seconds() + time.time()), log_message.id))
             await conn.commit()
         if total_seconds:
             self.auto_unban.start() if not self.auto_unban.is_running() else self.auto_unban.restart()
@@ -559,7 +562,9 @@ class ModCog(commands.Cog):
                 new_time = duration.strip("d")
                 td +=  datetime.timedelta(days= int(new_time))
             else:
-                return await ctx.send(f"Invalid input: `!mute @user 3h` or `!mute @user 10m,5d`")
+                embed = discord.Embed(title="Invalid Duration",
+                                      description=f"- `{duration}` is not a valid duration.")
+                return await ctx.send(embed=embed, delete_after=5.0)
 
         total_seconds = int(td.total_seconds())
         days = total_seconds // 86400
@@ -568,7 +573,9 @@ class ModCog(commands.Cog):
         seconds = total_seconds % 60
 
         if days > 28:
-            return await ctx.send("The maximum mute time is 28 days. Please set a mute time below it.", delete_after=5)
+            embed = discord.Embed(title="Invalid Duration",
+                                  description=f"- The maximum mute time is 28 days. Please set a mute time below it.")
+            return await ctx.send(embd=embed, delete_after=5.0)
         try:
             await member.timeout(td, reason=f"Muted by {ctx.author} for: {reason}")
         except discord.Forbidden as e:
@@ -1587,3 +1594,7 @@ class AppealView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(label="Appeal", style=discord.ButtonStyle.link, url="https://discord.gg/er2ErWNZjG"))
+class PreviousCase(discord.ui.View):
+    def __init__(self, message_id:int):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label="Tempban Case", style=discord.ButtonStyle.link, url=f"https://discord.com/channels/{GUILD_ID}/{MOD_LOG}/{message_id}"))
