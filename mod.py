@@ -1534,7 +1534,7 @@ class MassKickModal(discord.ui.Modal):
             for user in self.actual_users:
                 if user.top_role >= interaction.user.top_role:
                     continue
-                if not member.bot:
+                if not user.bot:
                     user_embed = discord.Embed(title="You have been kicked",
                                                description=f">>> **Reason:** {self.reason.value}",
                                                color=discord.Color.brand_red(),
@@ -1542,7 +1542,7 @@ class MassKickModal(discord.ui.Modal):
                     user_embed.set_author(name=interaction.guild.name, icon_url=interaction.guild.icon.url)
                     user_embed.set_thumbnail(url=interaction.guild.icon.url)
                     try:
-                        await member.send(embed=user_embed)
+                        await user.send(embed=user_embed)
                     except discord.Forbidden:
                         pass
                 try:
