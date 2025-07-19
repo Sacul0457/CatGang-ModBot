@@ -6,8 +6,8 @@ import asyncio
 from uuid import uuid4
 import base64
 
-MOD_LOG =1350425247471636530  #1294290963971178587
-AUTOMOD_RULE = "not set"
+MOD_LOG =1350425247471636530
+AUTOMOD_RULE = 1395765752283398335
 
 class AutomodCog(commands.Cog):
     def __init__(self, bot:commands.Bot):
@@ -24,7 +24,7 @@ class AutomodCog(commands.Cog):
         return True
     @commands.Cog.listener("on_message")
     async def message_listener(self, message:discord.Message):
-        if message.author == self.bot.user or message.author.bot:
+        if message.author.bot:
             return
         bucket = self.bot.spam_limit.get_bucket(message)
         retry_after = bucket.update_rate_limit()
@@ -33,7 +33,7 @@ class AutomodCog(commands.Cog):
             
 
     async def purge_messages(self, member:discord.Member, channel:discord.TextChannel):
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(2.5)
         def check(msg:discord.Message):
             return msg.author == member and msg.channel == channel
         await channel.purge(limit=15, check=check)
@@ -66,7 +66,7 @@ class AutomodCog(commands.Cog):
             try:
                 await user.guild.ban(user, reason=f"AutoBanned for: Spam: `>= 5 messages in 3s`")
             except discord.Forbidden as e:
-                print(e)
+                return print(e)
             except Exception as e:
                 await print(f"An error occurred: {e}")
             channel = user.guild.get_channel(MOD_LOG)
@@ -101,7 +101,7 @@ class AutomodCog(commands.Cog):
             try:
                 await user.timeout(datetime.timedelta(seconds=1), reason=f"Automuted for: Spam: `>= 5 messages in 3s`")
             except discord.Forbidden as e:
-                print(e)
+                return print(e)
             except Exception as e:
                 await print(f"An error occurred: {e}")
             channel = user.guild.get_channel(MOD_LOG)
@@ -135,7 +135,7 @@ class AutomodCog(commands.Cog):
             try:
                 await user.timeout(datetime.timedelta(seconds=1), reason=f"Automuted for: Spam: `>= 5 messages in 3s`")
             except discord.Forbidden as e:
-                print(e)
+                return print(e)
             except Exception as e:
                 await print(f"An error occurred: {e}")
             channel = user.guild.get_channel(MOD_LOG)
@@ -196,11 +196,11 @@ class AutomodCog(commands.Cog):
                                 (automod_case_id, user.id, "automodwarn", self.bot.user.id, time.time()))
             if action:
                 await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
-                                   (automod_case_id, user.id, action, self.bot.user.id, time.time()))
+                                   (case_id, user.id, action, self.bot.user.id, time.time()))
 
     @commands.Cog.listener("on_automod_action")
     async def automod_action_listener(self, action:discord.AutoModAction):
-        if action.rule_id == : AUTOMOD_RULE
+        if action.rule_id == AUTOMOD_RULE:
             await action.member.edit(nick="Change nickname to English")
 
 
