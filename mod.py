@@ -17,6 +17,7 @@ MODERATOR = 1319214233803816960
 SENIOR = 1343556008223707156
 ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 1343579448020308008)
 SACUL = 1294291057437048843
+GUILD_ID = 1319213192064536607
 
 def convert_to_base64():
     u = uuid4()
@@ -243,12 +244,21 @@ class ModCog(commands.Cog):
         try:
             user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
         except discord.NotFound:
+            async with self.bot.mod_pool.acquire() as conn:
+                await conn.execute('''DELETE FROM tempbandb WHERE user_id =?''',
+                                   (int(user_id,)))
+                await conn.commit()
             return
+        
         try:
             mod = self.bot.get_user(case_data["mod_id"]) or await self.bot.fetch_user(case_data["mod_id"])
         except discord.NotFound:
+            async with self.bot.mod_pool.acquire() as conn:
+                await conn.execute('''DELETE FROM tempbandb WHERE user_id =?''',
+                                   (int(user_id,)))
+                await conn.commit()
             return
-        guild = self.bot.get_guild(1294290832219963563)
+        guild = self.bot.get_guild(GUILD_ID)
         try:
             await guild.unban(user, reason=f"Tempban Expired")
         except discord.Forbidden:
