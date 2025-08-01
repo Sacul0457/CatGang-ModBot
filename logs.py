@@ -5,9 +5,15 @@ import datetime
 import time
 import timeit
 import json
-MOD_LOG =  1350425247471636530  
-MANAGEMENT =1350425247471636530 
+MOD_LOG =  1350425247471636530
+MANAGEMENT =1350425247471636530
 
+NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+MODERATOR = 1319214233803816960
+SENIOR = 1343556008223707156
+ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 1343579448020308008)
+SACUL = 1294291057437048843
+GUILD_ID = 1319213192064536607
 class LogCogs(commands.Cog):
     def __init__(self, bot:commands.Bot):
         self.bot = bot
@@ -96,7 +102,7 @@ class LogCogs(commands.Cog):
             channel = self.bot.get_channel(MANAGEMENT)
             await channel.send(embed=embed)
         elif before_member.nick != after_member.nick:
-            embed = discord.Embed(title="Nickname Change",
+            embed = discord.Embed(title="Nickname Changed",
                                 description=f">>> **User:** {after_member.mention} ({after_member.id})\
                                     \n**New:** `{after_member.display_name}`\n**Old:** `{before_member.display_name}`",
                                     color=discord.Color.orange())
@@ -196,7 +202,7 @@ class LogCogs(commands.Cog):
                     break
             await channel.send(embed=embed)
         elif before_role.color != after_role.color:
-            embedafter = discord.Embed(title="Role Colour Change (New Colour)",
+            embedafter = discord.Embed(title="Role Colour Changed (New Colour)",
                                        description=f"The {after_role.mention} new role colour.",
                                        timestamp=discord.utils.utcnow(),
                                        color=after_role.color)
