@@ -10,21 +10,24 @@ from uuid import uuid4
 import base64
 import paginator
 ButtonPaginator = paginator.ButtonPaginator
+from typing import TYPE_CHECKING
 
-MOD_LOG = 1350425247471636530
+if TYPE_CHECKING:
+    from main import ModBot
+
+MOD_LOG =  1350425247471636530
 NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
 MODERATOR = 1319214233803816960
 SENIOR = 1343556008223707156
 ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 1343579448020308008)
 SACUL = 1294291057437048843
 GUILD_ID = 1319213192064536607
-
 def convert_to_base64():
     u = uuid4()
     return base64.urlsafe_b64encode(u.bytes).rstrip(b'=').decode('ascii')
 
 class ModCog(commands.Cog):
-    def __init__(self, bot:commands.Bot):
+    def __init__(self, bot:ModBot):
         self.bot = bot
     
     async def cog_load(self):
@@ -724,7 +727,7 @@ class ModCog(commands.Cog):
     async def clean(self, ctx:commands.Context, limit : int, channel : discord.TextChannel | None = None) -> None:
         await ctx.message.delete()
         if limit > 800:
-            return await ctx.send(f"You can only purge up to a limit of `800` messages.", delete_after=5.0)
+            return await ctx.send(f"You can only purge up to `800` messages.", delete_after=5.0)
         def check(msg:discord.Message):
             return int(time.time() - msg.created_at.timestamp()) < datetime.timedelta(days=13).total_seconds()
         channel = channel or ctx.channel
@@ -1259,7 +1262,7 @@ class MassView(discord.ui.View):
     async def callback2(self, interaction:discord.Interaction, button:discord.ui.Button):
         await interaction.message.delete()
 
-    async def interaction_check(self, interaction:discord.Integration):
+    async def interaction_check(self, interaction:discord.Interaction):
         return interaction.user.id == self.mod_id
 
 class MassBanModal(discord.ui.Modal):
@@ -1430,7 +1433,7 @@ class MassMuteModal(discord.ui.Modal):
                 insert_value.append((case_id, user.id, "mute", interaction.user.id, time.time()))
                 if not user.bot:
                     try:
-                        await member.send(embed=user_embed)
+                        await user.send(embed=user_embed)
                     except discord.Forbidden:
                         pass
         response_embed = discord.Embed(title=f"✅ Successfully massmuted {len(muted)}/{len(self.users.value.split(","))}!" if muted else f"❌ Failed to massmute all the users.",
