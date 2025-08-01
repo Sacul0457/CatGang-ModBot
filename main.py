@@ -10,6 +10,7 @@ import datetime
 import time
 import random
 from paginator import ButtonPaginator
+import typing
 
 
 TOKEN = os.getenv("TOKEN")
