@@ -31,7 +31,8 @@ async def main():
 
         await conn.execute('''CREATE TABLE IF NOT EXISTS tempbandb(
                            user_id INTEGER PRIMARY KEY,
-                           time FLOAT) ''')
+                           time FLOAT,
+                           log_id INTEGER) ''')
         await conn.execute('''CREATE INDEX IF NOT EXISTS time_index on tempbandb(time)''')
         await conn.commit()
 
@@ -43,13 +44,10 @@ class ModBot(commands.Bot):
         intents.members = True
         intents.guilds = True
         intents.guild_messages = True
-        intents.auto_moderation_execution
-        intents.auto_moderation = True
         intents.emojis_and_stickers = True
         intents.guild_reactions = True
-        super().__init__(command_prefix=commands.when_mentioned_or("!"), intents=intents, help_command=None)
+        super().__init__(command_prefix=commands.when_mentioned_or("-"), intents=intents, help_command=None)
         self.spam_limit = commands.CooldownMapping.from_cooldown(5, 3.5, type=commands.BucketType.member)
-        
     async def setup_hook(self):
         self.mod_pool = await asqlite.create_pool("mod.db", size=4)
         for cog in cogs:
@@ -63,7 +61,6 @@ class ModBot(commands.Bot):
     async def close(self):
         await self.mod_pool.close()
         await super().close()
-
 bot = ModBot()
 
 @bot.event
@@ -136,7 +133,13 @@ async def help(ctx:commands.Context, feature:typing.Optional[str] = None) -> Non
                                description=description3,
                                color=discord.Color.blurple())
         embed3.set_footer(text=f"Use !help [command] for more information.")
-        button_pages = ButtonPaginator([embed1, embed2, embed3])
+
+        description4 = (f">>> -`!dm [user] [message]`\n- `!say [channel] [message]`")
+        embed4 = discord.Embed(title="Others",
+                               description=description4,
+                               color=discord.Color.blurple())
+        embed4.set_footer(text=f"Use !help [command] for more information.")
+        button_pages = ButtonPaginator([embed1, embed2, embed3, embed4])
         await button_pages.start(ctx.channel)
     else:
         if feature.lower() == "ban":
@@ -202,6 +205,22 @@ async def help(ctx:commands.Context, feature:typing.Optional[str] = None) -> Non
                             value=f"- `!slowmode [duration] [channel]`")
             embed.add_field(name="Example",
                             value=f"- `!slowmode 2h`\n- `!slowmode 50m,30s #general`", inline=False)
+            
+        elif feature.lower() == "say":
+            embed = discord.Embed(title="Say Command",
+                                  description="Send a message to a channel")
+            embed.add_field(name="Usage",
+                            value=f"- `!say [channel] [message]`")
+            embed.add_field(name="Example",
+                            value=f"- `!say Hai there`\n- `!say #general Bai bai`", inline=False)
+            
+        elif feature.lower() == "dm":
+            embed = discord.Embed(title="DM Command",
+                                  description="Send a message to a member")
+            embed.add_field(name="Usage",
+                            value=f"- `!dm [user] [message]`")
+            embed.add_field(name="Example",
+                            value=f"- `!dm @Sacul Hai there`", inline=False)
             
         elif feature.lower() == "clean":
             embed = discord.Embed(title="Clean Command",
@@ -313,5 +332,5 @@ async def help(ctx:commands.Context, feature:typing.Optional[str] = None) -> Non
                                   description=f"- There is no such command `{feature}`",
                                   color=discord.Color.brand_red())
         await ctx.send(embed=embed)
-
+            
 bot.run(TOKEN)
