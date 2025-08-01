@@ -5,12 +5,22 @@ import datetime
 import asyncio
 from uuid import uuid4
 import base64
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from main import ModBot
 
 MOD_LOG =1350425247471636530
-AUTOMOD_RULE = 1395765752283398335
+MOD_LOG =  1350425247471636530
+NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+MODERATOR = 1319214233803816960
+SENIOR = 1343556008223707156
+ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 1343579448020308008)
+SACUL = 1294291057437048843
+GUILD_ID = 1319213192064536607
 
 class AutomodCog(commands.Cog):
-    def __init__(self, bot:commands.Bot):
+    def __init__(self, bot : ModBot):
         self.bot = bot
         self.last_executed = 0
     def convert_to_base64(self) ->str:
@@ -39,10 +49,10 @@ class AutomodCog(commands.Cog):
         await channel.purge(limit=15, check=check)
         await channel.send(f"{member.mention} let's avoid spamming!\
                                     \n-# ⚠️ Repeating this can lead into a warning, please read <#1319606464264011806>.", delete_after=5.0)
-        await self.warn_user(member)
+        await self.warn_user(member, channel)
 
         
-    async def warn_user(self, user: discord.Member | discord.User) -> None:
+    async def warn_user(self, user: discord.Member | discord.User, channel:discord.TextChannel) -> None:
         async with self.bot.mod_pool.acquire() as conn:
             rows = await conn.execute('''SELECT NULL from moddb WHERE user_id =? AND action = ? ''',
                                          (user.id, "automodwarn"))
@@ -74,6 +84,7 @@ class AutomodCog(commands.Cog):
             
             embed = discord.Embed(title=f"Autobanned (`{case_id}`) | 10 warns",
                                 description=f">>> **User:** {user.mention} ({user.id})\
+                                    \n**Channel**: {channel.mention}\
                                     \n**Duration:** Permanent\
                                     \n**Reason:** Spam: `>= 5 messages in 3s`",
                                     timestamp=discord.utils.utcnow(),
@@ -99,16 +110,17 @@ class AutomodCog(commands.Cog):
                 except discord.Forbidden:
                     pass
             try:
-                await user.timeout(datetime.timedelta(seconds=1), reason=f"Automuted for: Spam: `>= 5 messages in 3s`")
+                await user.timeout(datetime.timedelta(days=1), reason=f"Automuted for: Spam: `>= 5 messages in 3s`")
             except discord.Forbidden as e:
                 return print(e)
             except Exception as e:
-                await print(f"An error occurred: {e}")
+                return print(f"An error occurred: {e}")
             channel = user.guild.get_channel(MOD_LOG)
             case_id = self.convert_to_base64()
             
             embed = discord.Embed(title=f"Automuted (`{case_id}`) | 8 warns",
                                 description=f">>> **User:** {user.mention} ({user.id})\
+                                    \n**Channel**: {channel.mention}\
                                     \n**Duration:** 1 day\
                                     \n**Reason:** Spam: `>= 5 messages in 3s`",
                                     timestamp=discord.utils.utcnow(),
@@ -133,7 +145,7 @@ class AutomodCog(commands.Cog):
                 except discord.Forbidden:
                     pass
             try:
-                await user.timeout(datetime.timedelta(seconds=1), reason=f"Automuted for: Spam: `>= 5 messages in 3s`")
+                await user.timeout(datetime.timedelta(hours=6), reason=f"Automuted for: Spam: `>= 5 messages in 3s`")
             except discord.Forbidden as e:
                 return print(e)
             except Exception as e:
@@ -142,6 +154,7 @@ class AutomodCog(commands.Cog):
             case_id = self.convert_to_base64()
             embed = discord.Embed(title=f"Automuted (`{case_id}`) | 5 warns",
                     description=f">>> **User:** {user.mention} ({user.id})\
+                        \n**Channel**: {channel.mention}\
                         \n**Duration:** 6 hours\
                         \n**Reason:** Spam: `>= 5 messages in 3s`",
                         timestamp=discord.utils.utcnow(),
@@ -169,6 +182,7 @@ class AutomodCog(commands.Cog):
             
             embed = discord.Embed(title=f"Autowarned (`{case_id}`) | 2 warns",
                                 description=f">>> **User:** {user.mention} ({user.id})\
+                                    \n**Channel**: {channel.mention}\
                                     \n**Reason:** Spam: `>= 5 messages in 3s`",
                                     timestamp=discord.utils.utcnow(),
                                     color=discord.Color.brand_red())
@@ -182,6 +196,7 @@ class AutomodCog(commands.Cog):
             
             embed = discord.Embed(title=f"Automod Spam",
                                 description=f">>> **User:** {user.mention} ({user.id})\
+                                    \n**Channel**: {channel.mention}\
                                     \n**Reason:** Spam: `>= 5 messages in 3s`",
                                     timestamp=discord.utils.utcnow(),
                                     color=discord.Color.brand_red())
@@ -197,12 +212,6 @@ class AutomodCog(commands.Cog):
             if action:
                 await conn.execute('''INSERT INTO moddb (case_id, user_id, action, mod_id, time) VALUES (?, ?, ?, ?, ?)''',
                                    (case_id, user.id, action, self.bot.user.id, time.time()))
-
-    @commands.Cog.listener("on_automod_action")
-    async def automod_action_listener(self, action:discord.AutoModAction):
-        if action.rule_id == AUTOMOD_RULE:
-            await action.member.edit(nick="Change nickname to English")
-
 
 
 async def setup(bot:commands.Bot):
