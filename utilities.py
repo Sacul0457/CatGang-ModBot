@@ -3,11 +3,20 @@ from discord.ext import commands, tasks
 import asyncio
 import datetime
 import time
+from discord import app_commands
 
 STICKY_CHANNEL = 1383545647977726062
-CATBOARD_CHANNEL = 1381029891641966632
+SKULLBOARD_CHANNEL = 1381029891641966632
 REPLY_EMOJI_ID = 1395943993593958473
-CUSTOM_EMOJI_ID = 1319238323436388422
+CUSTOM_EMOJI_ID = 1319238323436388422 
+
+MOD_LOG =  1350425247471636530 
+NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+MODERATOR = 1319214233803816960
+SENIOR = 1343556008223707156
+ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 1343579448020308008)
+SACUL = 1294291057437048843
+GUILD_ID = 1319213192064536607
 class Utilities(commands.Cog):
     def __init__(self, bot:commands.Bot):
         self. bot = bot
@@ -43,11 +52,11 @@ class Utilities(commands.Cog):
     @commands.Cog.listener("on_reaction_add")
     async def reaction_add_listener(self, reaction:discord.Reaction, user: discord.Member | discord.User) -> None:
         if reaction.is_custom_emoji():
-            if reaction.emoji.id == CUSTOM_EMOJI_ID and reaction.message.id not in self.already_added and reaction.count == 3:
-                channel = reaction.message.guild.get_channel(CATBOARD_CHANNEL)
+            if reaction.emoji.id == CUSTOM_EMOJI_ID and reaction.message.id not in self.already_added and reaction.count == 1:
+                channel = reaction.message.guild.get_channel(SKULLBOARD_CHANNEL)
                 if reaction.message.reference and not reaction.message.flags.forwarded:
                     replied_message = reaction.message.reference.cached_message or reaction.message.reference.resolved
-                    replied_content = replied_message.content if len(replied_message.content) < 57 else f"{replied_message.content[0:54]}..."
+                    replied_content = replied_message.content if len(replied_message.content) < 24 else f"{replied_message.content[0:21]}..."
                     embed = discord.Embed(title="",
                                         description=f"-# <:reply:{REPLY_EMOJI_ID}> [@{replied_message.author}](https://discord.com/users/{replied_message.author.id}): `{replied_content}`\
                                         \n**[@{reaction.message.author}](https://discord.com/users/{reaction.message.author.id})**: {reaction.message.content}",
@@ -67,6 +76,94 @@ class Utilities(commands.Cog):
                 await channel.send(embed=embed, view=JumpToMessage(reaction.message.jump_url))
 
                 self.already_added.append(reaction.message.id)
+    
+
+    @commands.command(name="dm", description="DM a user")
+    @commands.guild_only()
+    @commands.has_any_role(ADMIN)
+    @app_commands.describe(member="The memeber to send the message to", message="The message to send")
+    async def dm(self, ctx:commands.Context, member:discord.Member, *, message: str) -> None:
+        if message is None:
+            embed = discord.Embed(title="Message is Empty",
+                                  description=f"- You cannot send a user an emtpy message.",
+                                  color=discord.Color.brand_red(),
+                                  timestamp=discord.utils.utcnow())
+            return await ctx.send(embed=embed)
+        embed = discord.Embed("",description=f">>> - {message}",
+                              color=ctx.author.top_role.color)
+        embed.add_field(name="Sent by",
+                        value=f">>> {ctx.author.mention} ({ctx.author.id})")
+        embed.set_author(name=ctx.guild.name, icon_url=ctx.guild.icon.url)
+        embed.set_thumbnail(url=ctx.guild.icon.url)
+        embed.set_footer(text=f"@{ctx.author}", icon_url=ctx.author.display_avatar.url)
+        try:
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            embed = discord.Embed(title="Unable to DM",
+                                  description=f"- Unable to DM the member {member.mention}")
+            await ctx.send(embed=embed)
+
+    @dm.error
+    async def dm_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!dm [user] [message]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.MemberNotFound):
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.argument}` is not a member.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
+            
+
+    @commands.command(name="say", description="Send a message in a channel")
+    @commands.guild_only()
+    @commands.has_any_role(ADMIN)
+    @app_commands.describe(member="The channel to send the message to", message="The message to send")
+    async def say(self, ctx:commands.Context, channel:discord.TextChannel, *, message: str) -> None:
+        if message is None:
+            embed = discord.Embed(title="Message is Empty",
+                                  description=f"- You cannot send an emtpy message.",
+                                  color=discord.Color.brand_red(),
+                                  timestamp=discord.utils.utcnow())
+            return await ctx.send(embed=embed)
+        channel = channel or ctx.channel
+        embed = discord.Embed("",description=f">>> - {message}",
+                              color=ctx.author.top_role.color)
+        embed.set_thumbnail(url=ctx.author.display_avatar.url)
+        embed.set_author(text=f"@{ctx.author} said...", icon_url=ctx.author.display_avatar.url)
+        try:
+            await channel.send(embed=embed)
+        except discord.Forbidden:
+            embed = discord.Embed(title="Unable to Send",
+                                  description=f"- Unable to send a message in {channel.mention}")
+            await ctx.send(embed=embed)
+
+    @say.error
+    async def say_error(self, ctx:commands.Context, error:commands.CommandError):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(title="Invalid Input",
+                                  description=f"\n- `!say [channel] [message]`",
+                                    color=discord.Color.brand_red())
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        elif isinstance(error, commands.ChannelNotFound):
+            embed = discord.Embed(title="Channel Not Found",
+                                  description=f"- `#{error.argument}` is not a text channel.",
+                                    color=discord.Color.brand_red())
+        else:
+            embed = discord.Embed(title="An Error Occurred",
+                                  description=f"- {error}",
+                                  color=discord.Color.brand_red())
+        await ctx.send(embed=embed)
+
+        
 async def setup(bot:commands.Bot):
     await bot.add_cog(Utilities(bot))
 
