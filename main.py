@@ -48,7 +48,7 @@ class ModBot(commands.Bot):
         intents.emojis_and_stickers = True
         intents.guild_reactions = True
         super().__init__(
-            command_prefix=commands.when_mentioned_or("-"),
+            command_prefix=commands.when_mentioned_or("!"),
             intents=intents,
             help_command=None,
         )
@@ -74,7 +74,7 @@ class ModBot(commands.Bot):
 bot = ModBot()
 
 
-# @bot.event
+ @bot.event
 async def on_command_error(ctx: commands.context, error: commands.CommandError):
     pass
 
