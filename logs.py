@@ -20,7 +20,7 @@ class LogCogs(commands.Cog):
 
     @commands.Cog.listener("on_message_delete")
     async def message_delete_listener(self, message:discord.Message):
-        if message.author.id == self.bot.user.id:
+        if message.author.id == self.bot.user.id: #type: ignore
             return
         embed = discord.Embed(title="Message Deleted",
                               description=f"> **User:** {message.author.mention} ({message.author.id})\n> **Channel:** {message.channel.mention}\
@@ -28,16 +28,19 @@ class LogCogs(commands.Cog):
                                 color=discord.Color.brand_red(),
                                 timestamp=discord.utils.utcnow())
         embed.set_author(name=f"@{message.author}", icon_url=message.author.display_avatar.url)
-        async for entry in message.guild.audit_logs(action=discord.AuditLogAction.message_delete, limit=1):
-            if entry.target.id == message.author.id:
-                mod = message.guild.get_member(entry.user_id)
-                embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
-                break
+        if message.guild:
+            async for entry in message.guild.audit_logs(action=discord.AuditLogAction.message_delete, limit=1):
+                if entry and entry.target and entry.target.id == message.author.id:
+                    mod = message.guild.get_member(entry.user_id) #type: ignore
+                    if mod is not None:
+                        embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
+                    break
         channel = self.bot.get_channel(MOD_LOG)
-        if message.attachments:
-            await channel.send(embed=embed, files=[await image.to_file() for image in message.attachments])
-        else:
-            await channel.send(embed=embed)
+        if channel:
+            if message.attachments:
+                await channel.send(embed=embed, files=[await image.to_file() for image in message.attachments]) #type: ignore
+            else:
+                await channel.send(embed=embed) #type: ignore
     @commands.Cog.listener("on_message_edit")
     async def message_edit_listener(self, before_edit:discord.Message, after_edit:discord.Message):
         if before_edit.author == self.bot:
@@ -60,7 +63,7 @@ class LogCogs(commands.Cog):
 
     @commands.Cog.listener("on_bulk_message_delete")
     async def bulk_message_delete_listener(self, messages:list[discord.Message]):
-        embed = discord.Embed(title="Bulk Message Delete",
+        embed = discord.Embed(title="Messages Bulk Deleted",
                               description=f"- {len(messages)} messages were bulk deleted in {messages[0].channel.mention}",
                                 color=discord.Color.brand_red(),
                                 timestamp=discord.utils.utcnow())
@@ -289,6 +292,7 @@ class LogCogs(commands.Cog):
                 channel = self.bot.get_channel(MANAGEMENT)
                 await channel.send(embed=embed)
             elif before_channel.overwrites != after_channel.overwrites:
+                return
                 after_channel_ovwerites = {}
 
                 for role, perm_object in after_channel.overwrites.items():
@@ -339,7 +343,7 @@ class LogCogs(commands.Cog):
                                   color=discord.Color.blurple(),
                                   timestamp=discord.utils.utcnow())
             async for entry in guild.audit_logs(action=discord.AuditLogAction.emoji_update, limit=1):
-                if entry.target.id == emoji.id:
+                if entry.target.id == new_emoji.id:
                     mod = guild.get_member(entry.user_id) or await guild.fetch_member(entry.user_id)
                     embed.set_footer(text=f"Updated by @{mod}", icon_url=mod.display_avatar.url)
             embed.set_thumbnail(url=new_emoji.url)
