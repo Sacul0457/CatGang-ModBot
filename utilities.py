@@ -165,8 +165,8 @@ class Utilities(commands.Cog):
     @commands.guild_only()
     @commands.has_any_role(*ADMIN)
     async def say(
-        self, ctx: commands.Context, channel: discord.TextChannel, *, message: str) -> None:
-        if message is None:
+        self, ctx: commands.Context, channel: discord.TextChannel | str, *, message: str) -> None:
+        if message is None and channel and isinstance(channel, discord.TextChannel) or channel is None:
             embed = discord.Embed(
                 title="Message is Empty",
                 description=f"- You cannot send an emtpy message.",
@@ -174,25 +174,41 @@ class Utilities(commands.Cog):
                 timestamp=discord.utils.utcnow(),
             )
             return await ctx.send(embed=embed)
-        channel = channel or ctx.channel
-        embed = discord.Embed(
-            title="", description=f"{message}", color=ctx.author.top_role.color
-        )
-        embed.set_thumbnail(url=ctx.author.display_avatar.url)
-        embed.set_author(
-            name=f"@{ctx.author} said...", icon_url=ctx.author.display_avatar.url
-        )
-        try:
-            await channel.send(embed=embed)
-        except discord.Forbidden:
+        if isinstance(channel, discord.TextChannel):
             embed = discord.Embed(
-                title="Unable to Send",
-                description=f"- Unable to send a message in {channel.mention}",
+                title="", description=f"{message}", color=ctx.author.top_role.color
             )
-            return await ctx.send(embed=embed)
+            embed.set_thumbnail(url=ctx.author.display_avatar.url)
+            embed.set_author(
+                name=f"@{ctx.author} said...", icon_url=ctx.author.display_avatar.url
+            )
+            try:
+                await channel.send(embed=embed)
+            except discord.Forbidden:
+                embed = discord.Embed(
+                    title="Unable to Send",
+                    description=f"- Unable to send a message in {channel.mention}",
+                )
+                return await ctx.send(embed=embed)
+        else:
+            embed = discord.Embed(
+                title="", description=f"{channel} {message}", color=ctx.author.top_role.color
+            )
+            embed.set_thumbnail(url=ctx.author.display_avatar.url)
+            embed.set_author(
+                name=f"@{ctx.author} said...", icon_url=ctx.author.display_avatar.url
+            )
+            try:
+                await ctx.send(embed=embed)
+            except discord.Forbidden:
+                embed = discord.Embed(
+                    title="Unable to Send",
+                    description=f"- Unable to send a message in {ctx.channel.mention}",
+                )
+                return await ctx.send(embed=embed)
 
         channel_embed = discord.Embed(
-            title=f"✅ Successfully sent a message in {channel.mention}",
+            title=f"✅ Successfully sent a message in {ctx.channel.mention}",
             color=discord.Color.brand_green(),
         )
         await ctx.send(embed=channel_embed, delete_after=5.0)
