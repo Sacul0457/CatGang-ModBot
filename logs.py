@@ -381,6 +381,35 @@ class LogCogs(commands.Cog):
                         embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
                 channel = guild.get_channel(MOD_LOG)
                 await channel.send(embed=embed)
-            
+    @commands.Cog.listener('on_member_join')
+    async def member_join_listener(self, member:discord.Member) -> None:
+        channel = self.bot.get_channel(MOD_LOG)
+        if channel is None:
+            return
+        embed = discord.Embed(title="Member Joined",
+                              description=f">>> - **User:** {member.mention} ({member.id})\
+                                \n- **Account created:** {discord.utils.format_dt(member.created_at, style="f")}",
+                                color=discord.Color.brand_green(),
+                                timestamp=discord.utils.utcnow())
+        embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
+        embed.set_thumbnail(url=member.display_avatar.url)
+        await channel.send(embed=embed)
+
+    @commands.Cog.listener('on_member_remove')
+    async def member_leave_listener(self, member:discord.Member) -> None:
+        channel = self.bot.get_channel(MOD_LOG)
+        if channel is None:
+            return
+        embed = discord.Embed(title="Member Left",
+                              description=f">>> - **User:** {member.mention} ({member.id})\
+                                \n- **Account created:** {discord.utils.format_dt(member.created_at, style="f")}\
+                                \n- **Previously Joined:** {discord.utils.format_dt(member.joined_at, style="f")}\
+                                \n- **Roles:** {", ".join(role.mention for role in member.roles if role and not role.id == member.guild.id)}",
+                                color=discord.Color.brand_red(),
+                                timestamp=discord.utils.utcnow())
+        embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
+        embed.set_thumbnail(url=member.display_avatar.url)
+        await channel.send(embed=embed)
+
 async def setup(bot:commands.Bot):
     await bot.add_cog(LogCogs(bot))
