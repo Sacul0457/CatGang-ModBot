@@ -165,7 +165,7 @@ class Utilities(commands.Cog):
     @commands.guild_only()
     @commands.has_any_role(*ADMIN)
     async def say(
-        self, ctx: commands.Context, channel: discord.TextChannel | str, *, message: str) -> None:
+        self, ctx: commands.Context, channel: discord.TextChannel | str, *, message: str = None) -> None:
         if message is None and channel and isinstance(channel, discord.TextChannel) or channel is None:
             embed = discord.Embed(
                 title="Message is Empty",
@@ -178,10 +178,6 @@ class Utilities(commands.Cog):
             embed = discord.Embed(
                 title="", description=f"{message}", color=ctx.author.top_role.color
             )
-            embed.set_thumbnail(url=ctx.author.display_avatar.url)
-            embed.set_author(
-                name=f"@{ctx.author} said...", icon_url=ctx.author.display_avatar.url
-            )
             try:
                 await channel.send(embed=embed)
             except discord.Forbidden:
@@ -193,10 +189,6 @@ class Utilities(commands.Cog):
         else:
             embed = discord.Embed(
                 title="", description=f"{channel} {message}", color=ctx.author.top_role.color
-            )
-            embed.set_thumbnail(url=ctx.author.display_avatar.url)
-            embed.set_author(
-                name=f"@{ctx.author} said...", icon_url=ctx.author.display_avatar.url
             )
             try:
                 await ctx.send(embed=embed)
