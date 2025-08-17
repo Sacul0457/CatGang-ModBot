@@ -188,7 +188,7 @@ class Utilities(commands.Cog):
                 return await ctx.send(embed=embed)
         else:
             embed = discord.Embed(
-                title="", description=f"{channel} {message}", color=ctx.author.top_role.color
+                title="", description=f"{channel} {message if message is not None else ""}", color=ctx.author.top_role.color
             )
             try:
                 await ctx.send(embed=embed)
