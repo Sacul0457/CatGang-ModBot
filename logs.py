@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands
 import asyncio
@@ -5,7 +7,10 @@ import datetime
 import time
 import timeit
 import json
-MOD_LOG =  1350425247471636530
+from typing import TYPE_CHECKING
+
+
+EVENTS_LOGS =  1350425247471636530
 MANAGEMENT = 1406941451799101531
 
 NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
@@ -41,7 +46,7 @@ class LogCogs(commands.Cog):
                     if mod is not None:
                         embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
                     break
-        channel = self.bot.get_channel(MOD_LOG)
+        channel = self.bot.get_channel(EVENTS_LOGS)
         if channel:
             if message.attachments:
                 try:
@@ -69,7 +74,7 @@ class LogCogs(commands.Cog):
         embed.add_field(name="After",
                         value=f">>> {f"{after_edit.content[:1017]}..." if len(after_edit.content) > 1023 else after_edit.content}", inline=False)
         embed.set_author(name=f"@{after_edit.author}", icon_url=after_edit.author.display_avatar.url)
-        channel = self.bot.get_channel(MOD_LOG)
+        channel = self.bot.get_channel(EVENTS_LOGS)
         await channel.send(embed=embed)
 
     @commands.Cog.listener("on_bulk_message_delete")
@@ -87,7 +92,7 @@ class LogCogs(commands.Cog):
                     break
                 embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
                 break
-        channel = self.bot.get_channel(MOD_LOG)
+        channel = self.bot.get_channel(EVENTS_LOGS)
         await channel.send(embed=embed)
 
     @commands.Cog.listener("on_member_update")
@@ -139,7 +144,7 @@ class LogCogs(commands.Cog):
                         break
                     embed.set_footer(text=f"Changed by @{mod}", icon_url=mod.display_avatar.url)
                     break
-            channel = self.bot.get_channel(MOD_LOG)
+            channel = self.bot.get_channel(EVENTS_LOGS)
             await channel.send(embed=embed)
 
     @commands.Cog.listener("on_guild_role_create")
@@ -421,7 +426,7 @@ class LogCogs(commands.Cog):
                         break
                     embed.set_footer(text=f"Updated by @{mod}", icon_url=mod.display_avatar.url)
             embed.set_thumbnail(url=new_emoji.url)
-            channel = guild.get_channel(MOD_LOG)
+            channel = guild.get_channel(EVENTS_LOGS)
             await channel.send(embed=embed)
         else:
             before_list = {emoji for emoji in before}
@@ -441,7 +446,7 @@ class LogCogs(commands.Cog):
                         if mod is None:
                             break
                         embed.set_footer(text=f"Created by @{mod}", icon_url=mod.display_avatar.url)
-                channel = guild.get_channel(MOD_LOG)
+                channel = guild.get_channel(EVENTS_LOGS)
                 await channel.send(embed=embed)
             else:
                 emoji : discord.Emoji = list(removed)[0]
@@ -457,14 +462,14 @@ class LogCogs(commands.Cog):
                         if mod is None:
                             break
                         embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
-                channel = guild.get_channel(MOD_LOG)
+                channel = guild.get_channel(EVENTS_LOGS)
                 await channel.send(embed=embed)
 
     @commands.Cog.listener('on_member_join')
     async def member_join_listener(self, member:discord.Member) -> None:
         if member.guild.id != GUILD_ID:
             return
-        channel = self.bot.get_channel(MOD_LOG)
+        channel = self.bot.get_channel(EVENTS_LOGS)
         if channel is None:
             return
         embed = discord.Embed(title="Member Joined",
@@ -480,7 +485,7 @@ class LogCogs(commands.Cog):
     async def member_leave_listener(self, member:discord.Member) -> None:
         if member.guild.id != GUILD_ID:
             return
-        channel = self.bot.get_channel(MOD_LOG)
+        channel = self.bot.get_channel(EVENTS_LOGS)
         if channel is None:
             return
         embed = discord.Embed(title="Member Left",
