@@ -12,11 +12,15 @@ CUSTOM_EMOJI_ID = 1319238323436388422
 
 MOD_LOG =  1350425247471636530 
 NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+
 MODERATOR = 1319214233803816960
 SENIOR = 1343556008223707156
 ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 1343579448020308008)
 SACUL = 1294291057437048843
+
 GUILD_ID = 1319213192064536607
+
+
 class Utilities(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -36,7 +40,14 @@ class Utilities(commands.Cog):
         self.already_added = []
 
     async def cog_load(self):
-        channel = await self.bot.fetch_channel(STICKY_CHANNEL)
+        channel : discord.TextChannel = await self.bot.fetch_channel(STICKY_CHANNEL)
+        try:
+            last_message = await channel.fetch_message(channel.last_message_id)
+        except discord.NotFound:
+            return
+        if last_message.author == self.bot.user:
+            self.last_sent_data = last_message
+            return
         last_sent_message = await channel.send(embed=self.embed)
         self.last_sent_data = last_sent_message
 
@@ -57,11 +68,11 @@ class Utilities(commands.Cog):
     async def reaction_add_listener(
         self, reaction: discord.Reaction, user: discord.Member | discord.User
     ) -> None:
-        if reaction.is_custom_emoji():
+        if reaction.is_custom_emoji() and isinstance(reaction.emoji, discord.Emoji):
             if (
                 reaction.emoji.id == CUSTOM_EMOJI_ID
                 and reaction.message.id not in self.already_added
-                and reaction.count == 1
+                and reaction.count == 3
             ):
                 channel = reaction.message.guild.get_channel(SKULLBOARD_CHANNEL)
                 if reaction.message.reference and not reaction.message.flags.forwarded:
@@ -93,7 +104,7 @@ class Utilities(commands.Cog):
                         timestamp=discord.utils.utcnow(),
                     )
                     embed.set_author(
-                        name=f"@{user} said...", icon_url=user.display_avatar.url
+                        name=f"@{reaction.message.author} said...", icon_url=reaction.message.author.display_avatar.url
                     )
 
                 if reaction.message.attachments:
@@ -107,10 +118,9 @@ class Utilities(commands.Cog):
 
     @commands.command(name="dm", description="DM a user")
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN)
+    @commands.has_any_role(*ADMIN, SACUL)
     async def dm(
         self, ctx: commands.Context, member: discord.Member, *, message: str) -> None:
-        await ctx.message.delete()
         if message is None:
             embed = discord.Embed(
                 title="Message is Empty",
@@ -119,13 +129,8 @@ class Utilities(commands.Cog):
                 timestamp=discord.utils.utcnow(),
             )
             return await ctx.send(embed=embed)
-        embed = discord.Embed(
-            title="", description=f"{message}", color=ctx.author.top_role.color
-        )
-        embed.set_author(name=ctx.guild.name, icon_url=ctx.guild.icon.url)
-        embed.set_thumbnail(url=ctx.guild.icon.url)
         try:
-            await member.send(embed=embed)
+            await member.send(view=SayDmView(member, message, ctx.message.attachments if ctx.message.attachments else None))
         except discord.Forbidden:
             embed = discord.Embed(
                 title="Unable to DM",
@@ -163,7 +168,7 @@ class Utilities(commands.Cog):
 
     @commands.command(name="say", description="Send a message in a channel")
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN)
+    @commands.has_any_role(*ADMIN, SACUL)
     async def say(
         self, ctx: commands.Context, channel: discord.TextChannel | str, *, message: str = None) -> None:
         if message is None and channel and isinstance(channel, discord.TextChannel) or channel is None:
@@ -175,11 +180,8 @@ class Utilities(commands.Cog):
             )
             return await ctx.send(embed=embed)
         if isinstance(channel, discord.TextChannel):
-            embed = discord.Embed(
-                title="", description=f"{message}", color=ctx.author.top_role.color
-            )
             try:
-                await channel.send(embed=embed)
+                await channel.send(view=SayDmView(channel, message, ctx.message.attachments if ctx.message.attachments else None))
             except discord.Forbidden:
                 embed = discord.Embed(
                     title="Unable to Send",
@@ -187,11 +189,9 @@ class Utilities(commands.Cog):
                 )
                 return await ctx.send(embed=embed)
         else:
-            embed = discord.Embed(
-                title="", description=f"{channel} {message if message is not None else ""}", color=ctx.author.top_role.color
-            )
+            message = f"{channel} {message if message is not None else ""}"
             try:
-                await ctx.send(embed=embed)
+                await ctx.send(view=SayDmView(ctx.channel, message, ctx.message.attachments if ctx.message.attachments else None))
             except discord.Forbidden:
                 embed = discord.Embed(
                     title="Unable to Send",
@@ -242,3 +242,29 @@ class JumpToMessage(discord.ui.View):
                 label="Jump to message!", style=discord.ButtonStyle.link, url=url
             )
         )
+
+class DMContainer(discord.ui.Container):
+    def __init__(self, member: discord.Member, message: str, attachments: list[discord.Attachment] | None = None):
+        super().__init__()
+        self.add_item(discord.ui.Section(f"## {member.guild.name}\
+                                         \n>>> {message}", accessory=discord.ui.Thumbnail(member.guild.icon.url if member.guild.icon else "")))
+        if attachments is not None:
+            self.add_item(discord.ui.MediaGallery(*[discord.MediaGalleryItem(attachment.url) for attachment in attachments]))
+
+class SayContainer(discord.ui.Container):
+    def __init__(self, channel: discord.TextChannel, message: str, attachments: list[discord.Attachment] | None = None):
+        super().__init__()
+        self.add_item(discord.ui.Section(f"## {channel.guild.name}\
+                                         \n>>> {message}", accessory=discord.ui.Thumbnail(channel.guild.icon.url if channel.guild.icon else "")))
+        if attachments is not None:
+            self.add_item(discord.ui.MediaGallery(*[discord.MediaGalleryItem(attachment.url) for attachment in attachments]))
+
+
+class SayDmView(discord.ui.LayoutView):
+    def __init__(self, messageable: discord.Member | discord.TextChannel, message: str,
+                  attachments: list[discord.Attachment] | None = None):
+        super().__init__(timeout=None)
+        if isinstance(messageable, discord.Member):
+            self.add_item(DMContainer(messageable, message, attachments))
+        else:
+            self.add_item(SayContainer(messageable, message, attachments)) 
