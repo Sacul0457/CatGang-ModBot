@@ -3,12 +3,10 @@ from discord.ext import commands
 from discord import app_commands
 import asqlite
 import os
-from dotenv import  load_dotenv
+from dotenv import load_dotenv
+
 load_dotenv()
 import asyncio
-import datetime
-import time
-import random
 from paginator import ButtonPaginator
 import typing
 
@@ -16,28 +14,39 @@ import typing
 TOKEN = os.getenv("TOKEN")
 STAFF_ROLE = 1336377690168758342
 
-cogs = ("mod", "logs", "automod", "utilities")
+cogs = ("mod", "logs", "automod", "utilities", "appeals")
 
 async def main():
     async with asqlite.connect("mod.db") as conn:
-        await conn.execute('''CREATE TABLE IF NOT EXISTS moddb(
+        await conn.execute(
+            """CREATE TABLE IF NOT EXISTS moddb(
                            case_id TEXT PRIMARY KEY, 
                            user_id INTEGER,
                            action TEXT,
                            mod_id INTEGER,
-                           time FLOAT) ''')
-        await conn.execute('''CREATE INDEX IF NOT EXISTS user_id_index on moddb(user_id)''')
-        await conn.execute('''CREATE INDEX IF NOT EXISTS mod_id_index on moddb(mod_id)''')
-        await conn.execute('''CREATE INDEX IF NOT EXISTS time_index on moddb(time)''')
+                           time FLOAT,
+                           log_id INTEGER) """)
+        await conn.execute("""CREATE INDEX IF NOT EXISTS user_id_index on moddb(user_id)""")
+        await conn.execute("""CREATE INDEX IF NOT EXISTS mod_id_index on moddb(mod_id)""")
+        await conn.execute("""CREATE INDEX IF NOT EXISTS time_index on moddb(time)""")
 
-        await conn.execute('''CREATE TABLE IF NOT EXISTS tempbandb(
+        await conn.execute(
+            """CREATE TABLE IF NOT EXISTS tempbandb(
                            user_id INTEGER PRIMARY KEY,
                            time FLOAT,
-                           log_id INTEGER) ''')
-        await conn.execute('''CREATE INDEX IF NOT EXISTS time_index on tempbandb(time)''')
+                           log_id INTEGER) """)
+        await conn.execute("""CREATE INDEX IF NOT EXISTS time_index on tempbandb(time)""")
+
+        await conn.execute('''CREATE TABLE IF NOT EXISTS appealdb(
+                           thread_id INTEGER PRIMARY KEY,
+                           user_id INTEGER,
+                           action TEXT) ''')
         await conn.commit()
 
+
 asyncio.run(main())
+
+
 class ModBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.none()
@@ -57,7 +66,7 @@ class ModBot(commands.Bot):
         )
 
     async def setup_hook(self):
-        self.mod_pool = await asqlite.create_pool("mod.db", size=4)
+        self.mod_pool = await asqlite.create_pool("mod.db", size=5)
         for cog in cogs:
             try:
                 await self.load_extension(cog)
@@ -73,9 +82,8 @@ class ModBot(commands.Bot):
 
 bot = ModBot()
 
-
- @bot.event
-async def on_command_error(ctx: commands.context, error: commands.CommandError):
+@bot.event
+async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     pass
 
 
@@ -126,8 +134,9 @@ async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> N
     if feature is None:
         description1 = f">>> - `!ban [user] [duration] [reason]`\n- `!unban [user] [reason]`\n- `!kick [user] [reason]`\
                         \n- `!mute [user] [duration] [reason]`\n- `!unmute [user] [reason]`\
-                        \n- `!warn [user] [reason]`\n- `!deletewarns [user] [reason]`\n- `!slowmode [duration] [channel]`\
-                        \n- `!clean [limit]`"
+                        \n- `!warn [user] [reason]`\n- `!deletewarns [user] [reason]`\n- `!unwarn [case_id] [reason]`\
+                        \n- `!slowmode [duration] [channel]`\
+                        \n- `!clean [limit]` \n- `!lock [channel] [reason]` \n- `!unlock [channel] [reason]`"
         embed1 = discord.Embed(
             title="Moderation Commands",
             description=description1,
@@ -135,7 +144,7 @@ async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> N
         )
         embed1.set_footer(text=f"Use !help [command] for more information")
 
-        description2 = f">>> - `!case [case_id]`\n- `!caselist user [user]`\n- `!caselist mod [user]`\n- `!deltecase [case_id]`"
+        description2 = f">>> - `!case [case_id]`\n- `!caselist user [user]`\n- `!caselist mod [user]`\n- `!deletecase [case_id]`"
         embed2 = discord.Embed(
             title="Case Commands",
             description=description2,
@@ -221,6 +230,16 @@ async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> N
                 name="Example", value=f"- `!deletewarns @Sacul Appealed`", inline=False
             )
 
+        elif feature.lower() == "unwarn":
+            embed = discord.Embed(
+                title="Unwarn Command",
+                description="Remove **a** warn from a user",
+            )
+            embed.add_field(name="Usage", value=f"- `!unwarn [case_id] [reason]`")
+            embed.add_field(
+                name="Example", value=f"- `!unwarn 1234abcd Appealed`", inline=False
+            )
+
         elif feature.lower() == "slowmode":
             embed = discord.Embed(
                 title="Slowmode Command",
@@ -232,7 +251,28 @@ async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> N
                 value=f"- `!slowmode 2h`\n- `!slowmode 50m,30s #general`",
                 inline=False,
             )
-
+        elif feature.lower() == "lock":
+            embed = discord.Embed(
+                title="Lock Command",
+                description="Lock a channel",
+            )
+            embed.add_field(name="Usage", value=f"- `!lock [channel] [reason]`")
+            embed.add_field(
+                name="Example",
+                value=f"- `!lock Raiding`\n- `!slowmode #general raid`",
+                inline=False,
+            )
+        elif feature.lower() == "unlock":
+            embed = discord.Embed(
+                title="Unlock Command",
+                description="Unlock a channel",
+            )
+            embed.add_field(name="Usage", value=f"- `!unlock [channel] [reason]`")
+            embed.add_field(
+                name="Example",
+                value=f"- `!unlock Raid ended`\n- `!unlock #general raid ended`",
+                inline=False,
+            )
         elif feature.lower() == "say":
             embed = discord.Embed(
                 title="Say Command", description="Send a message to a channel"
@@ -397,5 +437,6 @@ async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> N
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
+
             
 bot.run(TOKEN)
