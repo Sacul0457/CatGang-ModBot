@@ -192,7 +192,8 @@ class ButtonPaginator(Generic[PageT_co], discord.ui.View):
             await interaction.response.send_message(
                 "The paginator has stopped.", ephemeral=True
             )
-        await interaction.message.delete()
+        if interaction.message:
+            await interaction.message.delete()
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple, emoji="➡️")
     async def next_page(
@@ -241,3 +242,4 @@ class ButtonPaginator(Generic[PageT_co], discord.ui.View):
             )
 
         return self.message
+
