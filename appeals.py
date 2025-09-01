@@ -17,7 +17,7 @@ MAIN_SERVER = 1319213192064536607
 APPEAL_SERVER = 1342763981370298409
 
 APPEAL_CHANNEL = 1353850807719694439
-MOD_LOG = 1350425247471636530
+MOD_LOG = 1411982484744175638
 
 APPEAL_STAFF_LEADER = 1344364861659943025
 APPEAL_STAFF = 1353836099214119002
@@ -547,4 +547,5 @@ class AcceptDenyView(discord.ui.LayoutView):
     async def interaction_check(self, interaction: discord.Interaction):
         
         return any(role.id == APPEAL_STAFF for role in interaction.user.roles)
+
 
