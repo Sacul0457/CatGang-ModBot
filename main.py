@@ -144,7 +144,8 @@ async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> N
         )
         embed1.set_footer(text=f"Use !help [command] for more information")
 
-        description2 = f">>> - `!case [case_id]`\n- `!caselist user [user]`\n- `!caselist mod [user]`\n- `!deletecase [case_id]`"
+        description2 = f">>> - `!case [case_id]`\n- `!caselist user [user]`\n- `!caselist mod [user]`\n- `!deletecase [case_id]`\
+                        \n- `!cases`"
         embed2 = discord.Embed(
             title="Case Commands",
             description=description2,
@@ -419,12 +420,24 @@ async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> N
                 inline=False,
             )
 
+            embed5 = discord.Embed(
+                title="Cases Command", description="Show the last 30 cases"
+            )
+            embed5.add_field(name="Usage", value=f"- `!cases`")
+            embed5.add_field(
+                name="Example",
+                value=f"- `!cases`",
+                inline=False,
+            )
+
             if feature.lower() == "caselist":
-                pages = [embed2, embed3, embed4, embed]
+                pages = [embed2, embed3, embed4, embed5, embed]
             elif "delete" in feature.lower():
-                pages = [embed4, embed3, embed2, embed]
+                pages = [embed4, embed3, embed2, embed5, embed]
+            elif "cases" in feature:
+                pages = [embed5, embed4, embed3, embed2, embed]
             else:
-                pages = [embed, embed2, embed3, embed4]
+                pages = [embed, embed2, embed3, embed4, embed5]
 
             case_paginator = ButtonPaginator(pages)
             await case_paginator.start(ctx.channel)
@@ -438,5 +451,5 @@ async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> N
             )
         await ctx.send(embed=embed)
 
-            
+
 bot.run(TOKEN)
