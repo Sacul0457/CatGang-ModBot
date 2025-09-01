@@ -1832,6 +1832,7 @@ class ModCog(commands.Cog):
             embed = discord.Embed(
                 title=f"❌ No such case: `{case_id}`", color=discord.Color.brand_red()
             )
+            await ctx.send(embed=embed)
         else:
             try:
                 user = self.bot.get_user(
@@ -1861,7 +1862,7 @@ class ModCog(commands.Cog):
             embed.set_footer(
                 text=f"Mod: @{mod} ({mod.id})", icon_url=mod.display_avatar.url
             )
-        await ctx.send(embed=embed, view=JumpToCase(log_id))
+            await ctx.send(embed=embed, view=JumpToCase(log_id))
 
 
     @case.error
