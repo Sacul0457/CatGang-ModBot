@@ -290,7 +290,6 @@ class AcceptMuteModal(discord.ui.Modal):
         case_embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
         case_embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
         case_embed.set_thumbnail(url=member.display_avatar.url)
-        await main_log_channel.send(embed=case_embed)
         await interaction.followup.send(f"Success!", ephemeral=True)
 
         log_message = await main_log_channel.send(embed=case_embed)
@@ -547,5 +546,3 @@ class AcceptDenyView(discord.ui.LayoutView):
     async def interaction_check(self, interaction: discord.Interaction):
         
         return any(role.id == APPEAL_STAFF for role in interaction.user.roles)
-
-
