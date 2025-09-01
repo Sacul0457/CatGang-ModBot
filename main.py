@@ -9,6 +9,7 @@ load_dotenv()
 import asyncio
 from paginator import ButtonPaginator
 import typing
+from functions import save_to_appealdb, delete_from_appealdb
 
 
 TOKEN = os.getenv("TOKEN")
@@ -85,6 +86,48 @@ bot = ModBot()
 @bot.event
 async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     pass
+
+@bot.group(name="appeal")
+async def appeal(ctx: commands.Context) -> None:
+    if ctx.invoked_subcommand is None:
+        return await ctx.send(f"You need to either use info or add or delete a thread ID.")
+    
+@appeal.command()
+async def info(ctx: commands.Context, object: discord.Object) -> None:
+    if ctx.author.id != 802167689011134474:
+        return
+    await ctx.message.delete()
+    
+    async with bot.mod_pool.acquire() as conn:
+        row = await conn.execute('''SELECT user_id, action FROM appealdb WHERE thread_id = ?''',
+                           (object.id))
+        result = await row.fetchone()
+
+    if result is None:
+        return await ctx.send(f"Thread `{object.id}` is not saved to the DB.", delete_after=5.0)
+    else:
+        user_id = result['user_id']
+        action = result['action']
+        return await ctx.send(f"Showing results for thread: `{object.id}`\n```- User ID: {user_id}\n- Action: {action}```")    \
+        
+
+@appeal.command()
+async def add(ctx: commands.Context, object: discord.Object, user: discord.User, action: typing.Literal['warn', 'ban', 'Mute']) -> None:
+    if ctx.author.id != 802167689011134474:
+        return
+    await ctx.message.delete()
+
+    await save_to_appealdb(object.id, user.id, action)
+    await ctx.send(f"Successfully added {object.id} to the DB. Values: \n- user_id: {user.id}\n- Action: {action}", delete_after=5.0)
+
+
+@appeal.command()
+async def remove(ctx: commands.Context, object: discord.Object) -> None:
+    if ctx.author.id != 802167689011134474:
+        return
+    await ctx.message.delete()
+    await delete_from_appealdb(object.id)
+    await ctx.send(f"Successfully removed {object.id} from the DB.", delete_after=5.0)
 
 
 @bot.group(name="cog")
