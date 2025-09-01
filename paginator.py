@@ -206,7 +206,7 @@ class ButtonPaginator(Generic[PageT_co], discord.ui.View):
     async def last_page(
         self, interaction: Interaction, _: discord.ui.Button[Self]
     ) -> None:
-        self.current_page = len(self.pages)
+        self.current_page = len(self.pages) - 1
         await self.update_page(interaction)
 
     def reset_files(self, page_kwargs: dict[str, Any]) -> None:
