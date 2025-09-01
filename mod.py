@@ -136,7 +136,7 @@ class ModCog(commands.Cog):
         user_embed = discord.Embed(
             title="You have been warned",
             description=f">>> **Reason:** {reason}\
-                {f"\n**Message Sent:** `{replied_message.content}`"}" if ctx.message.reference and not replied_message.content else "",
+                {f"\n**Proof:** `{replied_message.content}`" if ctx.message.reference and replied_message.content else ""}",
             timestamp=discord.utils.utcnow(),
             color=discord.Color.brand_red(),
         )
@@ -162,8 +162,8 @@ class ModCog(commands.Cog):
         )
 
         if ctx.message.reference and replied_message.content:
-            embed.add_field(name=f"Message Sent by @{member}",
-                                 value=f"```{replied_message.content[0:1010]}```",
+            embed.add_field(name=f"Proof (msg by `@{member}`)",
+                                 value=f">>> {replied_message.content[0:1010]}",
                                  inline=False)
 
         embed.add_field(
@@ -301,7 +301,7 @@ class ModCog(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, MODERATOR, SACUL, SENIOR)
+    @commands.has_any_role(*ADMIN, MODERATOR, SACUL)
     async def deletewarns(
         self,
         ctx: commands.Context,
@@ -622,8 +622,7 @@ class ModCog(commands.Cog):
                 title="You have been banned",
                 description=f">>> {final_duration}\
                                     \n**Reason:** {final_reason}\
-                                    {f"\n**Message Sent:** `{replied_message.content}`"}" if ctx.message.reference and replied_message.content else
-                                    "",
+                                    {f"\n**Proof:** `{replied_message.content}`" if ctx.message.reference and replied_message.content else ""}",
                 timestamp=discord.utils.utcnow(),
                 color=discord.Color.brand_red(),
             )
@@ -671,8 +670,8 @@ class ModCog(commands.Cog):
             color=discord.Color.brand_red(),
         )
         if ctx.message.reference and replied_message.content:
-            embed.add_field(name=f"Message Sent by @{member}",
-                            value=f"```{replied_message.content[0:1010]}```",
+            embed.add_field(name=f"Proof (msg by `@{member}`)",
+                            value=f">>> {replied_message.content[0:1010]}",
                             inline=False)
 
         embed.add_field(
@@ -847,7 +846,7 @@ class ModCog(commands.Cog):
         user_embed = discord.Embed(
             title="You have been kicked",
             description=f">>> **Reason:** {reason}\
-                    {f"\n**Message Sent:** `{replied_message.content[0:1010]}`"}" if ctx.message.reference and replied_message.content else "",
+                    {f"\n**Proof:** `{replied_message.content}`" if ctx.message.reference and replied_message.content else ""}",
             timestamp=discord.utils.utcnow(),
             color=discord.Color.brand_red(),
         )
@@ -884,8 +883,8 @@ class ModCog(commands.Cog):
             color=discord.Color.brand_red(),
         )
         if ctx.message.reference and replied_message.content:
-            embed.add_field(name=f"Message Sent by @{member}",
-                            value=f"```{replied_message.content[0:1010]}```")
+            embed.add_field(name=f"Proof (msg by `@{member}`)",
+                            value=f">>> {replied_message.content[0:1010]}")
 
         embed.add_field(
             name=f"Kicked by", value=f">>> {ctx.author.mention} ({ctx.author.id})"
@@ -1046,7 +1045,7 @@ class ModCog(commands.Cog):
             title="You have been muted",
             description=f">>> **Duration:** {duration_message}\
                                 \n**Reason:** {final_reason}\
-                                {f"\n**Message Sent:** `{replied_message.content[0:1010]}`" if ctx.message.reference and replied_message.content else ""}",
+                                {f"\n**Proof:** `{replied_message.content}`" if ctx.message.reference and replied_message.content else ""}",
                                 timestamp=discord.utils.utcnow(),
                                 color=discord.Color.brand_red(),
         )
@@ -1073,8 +1072,8 @@ class ModCog(commands.Cog):
             color=discord.Color.brand_red(),
         )
         if ctx.message.reference and replied_message.content:
-            embed.add_field(name=f"Message Sent by @{member}",
-                            value=f"```{replied_message.content[0:1010]}```",
+            embed.add_field(name=f"Proof (msg by `@{member}`)",
+                            value=f">>> {replied_message.content[0:1010]}",
                             inline=False)
         embed.add_field(
             name=f"Muted by", value=f" >>> {ctx.author.mention} ({ctx.author.id})"
@@ -1821,7 +1820,7 @@ class ModCog(commands.Cog):
 
     @commands.command(name="case", aliases=["modlogsl", "caseinfo"])
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, MODERATOR, SENIOR, SACUL)
+    @commands.has_any_role(*ADMIN, MODERATOR, SENIOR, SACUL, APPEAL_STAFF)
     async def case(self, ctx: commands.Context, case_id: str):
         async with self.bot.mod_pool.acquire() as conn:
             row = await conn.execute(
@@ -1864,6 +1863,7 @@ class ModCog(commands.Cog):
             )
         await ctx.send(embed=embed, view=JumpToCase(log_id))
 
+
     @case.error
     async def case_error(self, ctx: commands.Context, error: commands.CommandError):
         if isinstance(error, commands.MissingRequiredArgument):
@@ -1879,6 +1879,57 @@ class ModCog(commands.Cog):
                 description=f"- {error}", color=discord.Color.brand_red()
             )
         await ctx.send(embed=embed)
+
+
+    @commands.command(name="cases")
+    @commands.guild_only()
+    @commands.has_any_role(*ADMIN, MODERATOR, SENIOR, SACUL, APPEAL_STAFF)
+    async def cases(self, ctx: commands.Context):
+        async with self.bot.mod_pool.acquire() as conn:
+            rows = await conn.execute(
+                """SELECT case_id, user_id, action, mod_id, time FROM moddb
+                                      ORDER BY time DESC LIMIT 30"""
+            )
+            results = await rows.fetchall()
+        if results:
+            results_per_page = 15
+            data = [
+                f"- <@{result['user_id']}> **{result["action"].capitalize()}** by <@{result["mod_id"]}> (`{result["case_id"]}`) | <t:{int(result["time"])}:d>"
+                for result in results
+            ]
+            embeds = [
+                discord.Embed(
+                    title="Last 30 cases",
+                    description=f">>> {'\n'.join(data[i:i + results_per_page])}",
+                )for i in range(0, len(results), results_per_page)]
+            paginator = ButtonPaginator(embeds)
+            await paginator.start(ctx.channel)
+        else:
+            embed = discord.Embed(
+                title=f"❌ No cases", color=discord.Color.brand_red()
+            )
+            await ctx.send(embed=embed)
+
+    @cases.error
+    async def cases_error(
+        self, ctx: commands.Context, error: commands.CommandError
+    ):
+        if isinstance(error, commands.MissingRequiredArgument):
+            embed = discord.Embed(
+                title="Invalid Input",
+                description=f"\n- `!cases`",
+                color=discord.Color.brand_red(),
+            )
+        elif isinstance(error, commands.MissingAnyRole):
+            return
+        else:
+            embed = discord.Embed(
+                title="An Error Occurred",
+                description=f"- {error}",
+                color=discord.Color.brand_red(),
+            )
+        await ctx.send(embed=embed)
+
 
     @commands.group(name="caselist")
     @commands.guild_only()
