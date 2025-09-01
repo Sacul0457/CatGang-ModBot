@@ -289,4 +289,3 @@ class AppealView(discord.ui.View):
                 url="https://discord.gg/er2ErWNZjG",
             )
         )
-
