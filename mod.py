@@ -301,7 +301,7 @@ class ModCog(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, MODERATOR, SACUL)
+    @commands.has_any_role(*ADMIN, MODERATOR, SACUL, SENIOR)
     async def deletewarns(
         self,
         ctx: commands.Context,
@@ -1832,7 +1832,7 @@ class ModCog(commands.Cog):
             embed = discord.Embed(
                 title=f"❌ No such case: `{case_id}`", color=discord.Color.brand_red()
             )
-            await ctx.send(embed=embed)
+            return await ctx.send(embed=embed)
         else:
             try:
                 user = self.bot.get_user(
