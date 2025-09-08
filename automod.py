@@ -102,7 +102,7 @@ class AutomodCog(commands.Cog):
                 return print(e)
             except Exception as e:
                 print(f"An error occurred: {e}")
-            channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(MOD_LOG)
             case_id = convert_to_base64()
 
             embed = discord.Embed(
@@ -117,7 +117,7 @@ class AutomodCog(commands.Cog):
 
             embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
             embed.set_thumbnail(url=user.display_avatar.url)
-            log_message = await channel.send(embed=embed)
+            log_message = await log_channel.send(embed=embed)
 
             action = "ban"
         elif warns == 8:
@@ -145,7 +145,7 @@ class AutomodCog(commands.Cog):
                 return print(e)
             except Exception as e:
                 return print(f"An error occurred: {e}")
-            channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(MOD_LOG)
             case_id = convert_to_base64()
 
             embed = discord.Embed(
@@ -160,7 +160,7 @@ class AutomodCog(commands.Cog):
 
             embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
             embed.set_thumbnail(url=user.display_avatar.url)
-            log_message = await channel.send(embed=embed)
+            log_message = await log_channel.send(embed=embed)
             action = "mute"
         elif warns == 5:
             if isinstance(user, discord.Member) and not user.bot:
@@ -187,7 +187,7 @@ class AutomodCog(commands.Cog):
                 return print(e)
             except Exception as e:
                 print(f"An error occurred: {e}")
-            channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(MOD_LOG)
             case_id = convert_to_base64()
             embed = discord.Embed(
                 title=f"Automuted (`{case_id}`) | 5 warns",
@@ -201,7 +201,7 @@ class AutomodCog(commands.Cog):
 
             embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
             embed.set_thumbnail(url=user.display_avatar.url)
-            log_message = await channel.send(embed=embed)
+            log_message = await log_channel.send(embed=embed)
             action = "mute"
         elif warns == 2:
             if isinstance(user, discord.Member) and not user.bot:
@@ -218,7 +218,7 @@ class AutomodCog(commands.Cog):
                     await user.send(embed=user_embed, view=AppealView())
                 except discord.Forbidden:
                     pass
-            channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(MOD_LOG)
             case_id = convert_to_base64()
 
             embed = discord.Embed(
@@ -232,10 +232,10 @@ class AutomodCog(commands.Cog):
 
             embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
             embed.set_thumbnail(url=user.display_avatar.url)
-            log_message = await channel.send(embed=embed)
+            log_message = await log_channel.send(embed=embed)
             action = "warn"
         else:
-            channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(MOD_LOG)
 
             embed = discord.Embed(
                 title=f"Automod Spam",
@@ -248,7 +248,7 @@ class AutomodCog(commands.Cog):
 
             embed.set_author(name=f"@{user}", icon_url=user.display_avatar.url)
             embed.set_thumbnail(url=user.display_avatar.url)
-            log_message = await channel.send(embed=embed)
+            log_message = await log_channel.send(embed=embed)
 
         automod_case_id = convert_to_base64()
         if action:
@@ -272,7 +272,6 @@ class AutomodCog(commands.Cog):
                     return
                 await message.channel.send(f"Hey {message.author.mention}, please only send media in this channel! Thanks.",
                                         delete_after=5.0)
-
 
 
 async def setup(bot: commands.Bot):
