@@ -1392,7 +1392,7 @@ class ModCog(commands.Cog):
     ):
         await ctx.message.delete()
         channel = channel or ctx.channel
-        if duration.lower() == "disable":
+        if duration.lower() == "disable" or duration.startswith("0"):
             if channel.slowmode_delay == 0:
                 channel_embed = discord.Embed(
                     title="An error occurred",
