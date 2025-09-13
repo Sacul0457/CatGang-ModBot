@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from main import ModBot
 
-
 MOD_LOG =  1411982484744175638
 NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
 MODERATOR = 1319214233803816960
@@ -123,6 +122,15 @@ class ModCog(commands.Cog):
             replied_message = ctx.message.reference.cached_message or ctx.message.reference.resolved
             reason = "No reason provided." if member is None and reason == "No reason provided." else f"{member}" if member is not None and reason == "No reason provided." else f"{member} {reason}"
             member = replied_message.author
+        else:
+            if member is None or not isinstance(member, discord.Member):
+                embed = discord.Embed(
+                    title="Invalid Input",
+                    description=f"\n- `!warn [user] [reason]`",
+                    color=discord.Color.brand_red(),
+                )
+                return await ctx.send(embed=embed)
+
 
         if isinstance(member, discord.Member) and member.top_role >= ctx.author.top_role:
             embed = discord.Embed(
@@ -195,7 +203,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -293,7 +301,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -394,7 +402,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -647,7 +655,7 @@ class ModCog(commands.Cog):
         except Exception as e:
             embed = discord.Embed(
                 title="An error occurred",
-                description=f"- {e}",
+                description=f"- {e}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.red(),
             )
             return await ctx.send(embed=embed, delete_after=5.0)
@@ -711,7 +719,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -805,7 +813,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -915,7 +923,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1104,7 +1112,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1206,7 +1214,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1259,7 +1267,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1310,7 +1318,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1371,7 +1379,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1486,7 +1494,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1565,7 +1573,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1593,7 +1601,7 @@ class ModCog(commands.Cog):
                     embed = discord.Embed(
                         title="Unable to Send",
                         description=f"- Unable to send a message in {channel.mention}",
-                        color=discord.C
+                        color=discord.Color.brand_green()
                     )
                     return await ctx.send(embed=embed)
         else:
@@ -1644,7 +1652,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1682,7 +1690,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1742,7 +1750,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1779,7 +1787,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -1877,7 +1885,7 @@ class ModCog(commands.Cog):
             return
         else:
             embed = discord.Embed(
-                description=f"- {error}", color=discord.Color.brand_red()
+                description=f"- {error}\n- Command: `{ctx.message.content}`", color=discord.Color.brand_red()
             )
         await ctx.send(embed=embed)
 
@@ -1926,7 +1934,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -2017,7 +2025,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -2084,7 +2092,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
@@ -2141,7 +2149,7 @@ class ModCog(commands.Cog):
         else:
             embed = discord.Embed(
                 title="An Error Occurred",
-                description=f"- {error}",
+                description=f"- {error}\n- Command: `{ctx.message.content}`",
                 color=discord.Color.brand_red(),
             )
         await ctx.send(embed=embed)
