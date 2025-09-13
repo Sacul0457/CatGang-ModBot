@@ -364,30 +364,7 @@ class LogCogs(commands.Cog):
                 await channel.send(embed=embed)
             elif before_channel.overwrites != after_channel.overwrites:
                 return
-                after_channel_ovwerites = {}
 
-                for role, perm_object in after_channel.overwrites.items():
-                    allow, deny = perm_object.pair()
-                    
-                    allowed_perms = {perm for perm, value in allow if value}
-                    denied_perms = {perm for perm, value in deny if value}
-
-                    after_channel_ovwerites[role.name] = {
-                        "allowed": allowed_perms,
-                        "denied": denied_perms
-                    }
-                before_channel_overwrites = {}
-
-                for role, perm_object in before_channel.overwrites.items():
-                    allow, deny = perm_object.pair()
-                    
-                    allowed_perms = {perm for perm, value in allow if value}
-                    denied_perms = {perm for perm, value in deny if value}
-
-                    before_channel_overwrites[role.name] = {
-                        "allowed": allowed_perms,
-                        "denied": denied_perms
-                    }
         else:
             if before_channel.name != after_channel.name:
                 embed = discord.Embed(title="Category Name Changed",
