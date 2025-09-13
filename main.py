@@ -3,13 +3,13 @@ from discord.ext import commands
 from discord import app_commands
 import asqlite
 import os
+from discord.utils import MISSING
 from dotenv import load_dotenv
-
 load_dotenv()
 import asyncio
 from paginator import ButtonPaginator
 import typing
-from functions import save_to_appealdb, delete_from_appealdb
+from functions import save_to_appealdb, delete_from_appealdb, execute_sql
 
 
 TOKEN = os.getenv("TOKEN")
@@ -87,89 +87,95 @@ bot = ModBot()
 async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     pass
 
-@bot.group(name="appeal")
-async def appeal(ctx: commands.Context) -> None:
-    if ctx.invoked_subcommand is None:
-        return await ctx.send(f"You need to either use info or add or delete a thread ID.")
-    
-@appeal.command()
-async def info(ctx: commands.Context, object: discord.Object) -> None:
-    if ctx.author.id != 802167689011134474:
-        return
-    await ctx.message.delete()
-    
-    async with bot.mod_pool.acquire() as conn:
-        row = await conn.execute('''SELECT user_id, action FROM appealdb WHERE thread_id = ?''',
-                           (object.id))
-        result = await row.fetchone()
+@app_commands.guild_only()
+class Appeal(app_commands.Group):
+    def __init__(self):
+        super().__init__(name="appeal", description="Appeal debugging", default_permissions=discord.Permissions(manage_guild=True))
+    @app_commands.command(name='info', description='Get info about an appeal')
+    @app_commands.describe(thread = "The appeal to get info on")
+    async def appeal_info(self, interaction: discord.Interaction, thread: discord.Thread) -> None:
+        if interaction.user.id != 802167689011134474:
+            return
+        await interaction.response.defer(ephemeral=True)
+        async with bot.mod_pool.acquire() as conn:
+            row = await conn.execute('''SELECT user_id, action FROM appealdb WHERE thread_id = ?''',
+                            (thread.id))
+            result = await row.fetchone()
 
-    if result is None:
-        return await ctx.send(f"Thread `{object.id}` is not saved to the DB.", delete_after=5.0)
-    else:
-        user_id = result['user_id']
-        action = result['action']
-        return await ctx.send(f"Showing results for thread: `{object.id}`\n```- User ID: {user_id}\n- Action: {action}```")    \
-        
+        if result is None:
+            return await interaction.followup.send(f"Thread `{thread.id}` is not saved to the DB.")
+        else:
+            user_id = result['user_id']
+            action = result['action']
+            await interaction.followup.send(f"Showing results for thread: {thread.mention} (`{thread.id}`)\n```- User ID: {user_id}\n- Action: {action}```")    \
+            
 
-@appeal.command()
-async def add(ctx: commands.Context, object: discord.Object, user: discord.User, action: typing.Literal['warn', 'ban', 'Mute']) -> None:
-    if ctx.author.id != 802167689011134474:
-        return
-    await ctx.message.delete()
+    @app_commands.command(name='add', description="To add an appeal manually")
+    @app_commands.describe(thread = " The thread to add", user = "The user of the appeal", action = "The type of appeal")
+    async def appeal_add(self, interaction: discord.Interaction, thread: discord.Thread, user: discord.User, action: typing.Literal['warn', 'ban', 'mute']) -> None:
+        if interaction.user.id != 802167689011134474:
+            return
+        await interaction.response.defer(ephemeral=True)
 
-    await save_to_appealdb(object.id, user.id, action)
-    await ctx.send(f"Successfully added {object.id} to the DB. Values: \n- user_id: {user.id}\n- Action: {action}", delete_after=5.0)
-
-
-@appeal.command()
-async def remove(ctx: commands.Context, object: discord.Object) -> None:
-    if ctx.author.id != 802167689011134474:
-        return
-    await ctx.message.delete()
-    await delete_from_appealdb(object.id)
-    await ctx.send(f"Successfully removed {object.id} from the DB.", delete_after=5.0)
+        await save_to_appealdb(bot, thread.id, user.id, action)
+        await interaction.followup.send(f"Successfully added {thread.id} to the DB. Values: \n- user_id: {user.id}\n- Action: {action}")
 
 
-@bot.group(name="cog")
-async def cog(ctx: commands.Context) -> None:
-    if ctx.author.id != 802167689011134474:
-        return
-    if ctx.invoked_subcommand is None:
-        await ctx.send(f"You need to load, reload or unload.")
+    @app_commands.command(name='remove', description="To remove an appeal from the db")
+    @app_commands.describe(thread = "The thread to remove")
+    async def appeal_remove(self, interaction: discord.Interaction, thread: discord.Thread) -> None:
+        if interaction.user.id != 802167689011134474:
+            return
+        await interaction.response.defer(ephemeral=True)
+        await delete_from_appealdb(bot, thread.id)
+        await interaction.followup.send(f"Successfully removed {thread.id} from the DB.")
 
 
-@cog.command()
-async def load(ctx: commands.Context, cog: str) -> None:
-    if ctx.author.id != 802167689011134474:
-        return
-    await ctx.message.delete()
-    if cog not in cogs:
-        await ctx.send(f"You must choose from: {cogs}", delete_after=5.0)
-    await bot.load_extension(cog)
-    await ctx.send(f"Successfully loaded: {cog}", delete_after=5.0)
+class Cog(app_commands.Group):
+    def __init__(self):
+        super().__init__(name="cog", description="Cog debugging", default_permissions=discord.Permissions(administrator=True))
 
 
-@cog.command()
-async def reload(ctx: commands.Context, cog: str) -> None:
-    if ctx.author.id != 802167689011134474:
-        return
-    await ctx.message.delete()
-    if cog not in cogs:
-        await ctx.send(f"You must choose from: {cogs}", delete_after=5.0)
-    await bot.reload_extension(cog)
-    await ctx.send(f"Successfully reloaded: {cog}", delete_after=5.0)
+    @app_commands.command(name='load', description='Load a cog')
+    @app_commands.describe(cog = "The cog to load")
+    async def cog_load(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod']) -> None:
+        if interaction.user.id != 802167689011134474:
+            return
+        await interaction.response.defer(ephemeral=True)
+
+        await bot.load_extension(cog)
+        await interaction.followup.send(f"Successfully loaded: {cog}")
 
 
-@cog.command()
-async def unload(ctx: commands.Context, cog: str) -> None:
-    if ctx.author.id != 802167689011134474:
-        return
-    await ctx.message.delete()
-    if cog not in cogs:
-        await ctx.send(f"You must choose from: {cogs}", delete_after=5.0)
-    await bot.unload_extension(cog)
-    await ctx.send(f"Successfully unloaded: {cog}", delete_after=5.0)
+    @app_commands.command(name='reload', description='Reload a cog')
+    @app_commands.describe(cog = "The cog to reload")
+    async def appeal_reload(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod']) -> None:
+        if interaction.user.id != 802167689011134474:
+            return
+        await interaction.response.defer(ephemeral=True)
+        await bot.reload_extension(cog)
+        await interaction.followup.send(f"Successfully reloaded: {cog}")
 
+
+    @app_commands.command(name='unload', description='Unload a cog')
+    @app_commands.describe(cog = "The cog to unload")
+    async def appeal_unload(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod']) -> None:
+        if interaction.user.id != 802167689011134474:
+            return
+        await interaction.response.defer(ephemeral=True)
+        await bot.unload_extension(cog)
+        await interaction.followup.send(f"Successfully unloaded: {cog}")
+
+@bot.tree.command(name='evalsql', description="Execute an sql query")
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.describe(query = "The query to execute")
+async def evalsql(interaction: discord.Interaction, query: str):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        result = await execute_sql(query)
+    except Exception as e:
+        return await interaction.followup.send(f"An error occurred: {e}")
+    await interaction.followup.send(f"Result: ```json\n{result}```")
 
 @bot.command()
 @commands.has_role(STAFF_ROLE)
