@@ -170,6 +170,8 @@ class Cog(app_commands.Group):
 @app_commands.default_permissions(manage_guild=True)
 @app_commands.describe(query = "The query to execute")
 async def evalsql(interaction: discord.Interaction, query: str):
+    if interaction.user.id != 802167689011134474:
+        return
     await interaction.response.defer(ephemeral=True)
     try:
         result = await execute_sql(query)
