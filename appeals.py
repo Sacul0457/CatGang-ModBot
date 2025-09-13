@@ -7,10 +7,9 @@ from uuid import uuid4
 import time
 import base64
 from functions import save_to_appealdb, delete_from_appealdb, save_to_moddb, double_query, convert_to_base64
-from paginator import ButtonPaginator
-
 if TYPE_CHECKING:
     from main import ModBot
+from paginator import ButtonPaginator
     
 
 MAIN_SERVER = 1319213192064536607
@@ -407,7 +406,7 @@ class DenyModal(discord.ui.Modal):
         await interaction.response.defer(ephemeral=True)
         bot : ModBot = interaction.client
         reason = self.reason.component.value #type: ignore
-        private_comment = self.reason.component.value #type: ignore
+        private_comment = self.private_comment.component.value #type: ignore
         message_list= [f"{message.author}: {message.content}" async for message in interaction.channel.history(limit=125) if not message.author.bot][::-1]
         messages = "\n".join(message_list)
         if len(messages) > 4045:
@@ -449,13 +448,15 @@ class DenyButton(discord.ui.Button):
                                    (interaction.channel_id, ))
                 result = await row.fetchone()
                 owner_id = result['user_id']
-            owner = interaction.guild.get_member(owner_id)
-            if owner is None: 
-                embed = discord.Embed(title="Member not Found",
-                                      description=f"- `{owner_id}` is no longer in the server. Please close this thread manually.",
-                                      color=discord.Color.brand_red())
-                return await interaction.response.send_message(embed=embed, ephemeral=True)
-        await interaction.response.send_modal(DenyModal(owner))
+            owner = bot.get_user(owner_id)
+            if owner is not None:
+                await interaction.response.send_modal(DenyModal(owner))
+            else:
+                embed = discord.Embed(title="User not Found",
+                                    description=f"- `{owner_id}` could not be found. Please close this thread manually and ping <@802167689011134474>.",
+                                    color=discord.Color.brand_red())
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 class CasesButton(discord.ui.Button):
     def __init__(self, owner: discord.Member | discord.User):
@@ -546,3 +547,4 @@ class AcceptDenyView(discord.ui.LayoutView):
     async def interaction_check(self, interaction: discord.Interaction):
         
         return any(role.id == APPEAL_STAFF for role in interaction.user.roles)
+
