@@ -347,10 +347,27 @@ class LogCogs(commands.Cog):
         if before_channel.guild.id != GUILD_ID:
             return
         if not isinstance(after_channel, discord.CategoryChannel):
+            before_channel: discord.TextChannel | discord.VoiceChannel | discord.ForumChannel | discord.StageChannel = before_channel
+            after_channel: discord.TextChannel | discord.VoiceChannel | discord.ForumChannel | discord.StageChannel = after_channel
             if before_channel.name != after_channel.name:
                 embed = discord.Embed(title="Channel Name Changed",
                                     description=f">>> **Channel:** {after_channel.mention} ({after_channel.id})\n**New:** `{after_channel.name}`\
                                         \n**Old:** `{before_channel.name}`",
+                                        timestamp=discord.utils.utcnow(),
+                                        color=discord.Color.blurple())
+                async for entry in after_channel.guild.audit_logs(action=discord.AuditLogAction.channel_update, limit=1):
+                    if entry.target.id == after_channel.id:
+                        mod = after_channel.guild.get_member(entry.user_id)
+                        if mod is None:
+                            break
+                        embed.set_footer(text=f"Changed by @{mod}", icon_url=mod.display_avatar.url)
+                        break
+                channel = self.bot.get_channel(MANAGEMENT)
+                await channel.send(embed=embed)
+            elif before_channel.slowmode_delay != after_channel.slowmode_delay:
+                embed = discord.Embed(title="Channel Slowmode Updated",
+                                    description=f">>> **Channel:** {after_channel.mention} ({after_channel.id})\n**New:** `{after_channel.slowmode_delay}s`\
+                                        \n**Old:** `{before_channel.slowmode_delay}s`",
                                         timestamp=discord.utils.utcnow(),
                                         color=discord.Color.blurple())
                 async for entry in after_channel.guild.audit_logs(action=discord.AuditLogAction.channel_update, limit=1):
