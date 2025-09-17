@@ -19,6 +19,8 @@ ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 13435794
 SACUL = 1294291057437048843
 
 GUILD_ID = 1319213192064536607
+STICKY_CHANNELS = [1383545647977726062, 1350595550223011992, 1352398956646371438, 1414630440865894400, 1350424916687589416, 1350424974623768627, 1350425018466701312, 1414627729260806205, 1414628631237365933]
+MEDIA_CATEGORY_ID = 1340256351317790730
 
 
 class Utilities(commands.Cog):
@@ -36,25 +38,33 @@ class Utilities(commands.Cog):
                                 \n- Must comply with Discord ToS, Guidelines, and Ad Policy\n- Only 1 server per ad with a valid invite\
                                 \n-  Asking others to check your ad or advertising elsewhere will result in a ban",
         )
-        self.last_sent_data = 0
+        self.only_media = (f"Please note that you can only send links/images/videos in these channels!")
+        self.last_sent_data : dict[int, discord.Message] = {}
         self.already_added = []
 
     async def cog_load(self):
-        channel : discord.TextChannel = await self.bot.fetch_channel(STICKY_CHANNEL)
-        try:
-            last_message = await channel.fetch_message(channel.last_message_id)
-        except discord.NotFound:
-            return
-        if last_message.author == self.bot.user:
-            self.last_sent_data = last_message
-            return
-        last_sent_message = await channel.send(embed=self.embed)
-        self.last_sent_data = last_sent_message
+        for channel_id in STICKY_CHANNELS:
+            channel : discord.TextChannel = await self.bot.fetch_channel(channel_id)
+            try:
+                last_message_id = channel.last_message_id or 0
+                last_message = await channel.fetch_message(last_message_id)
+            except discord.NotFound:
+                pass
+            if last_message.author == self.bot.user:
+                self.last_sent_data[channel_id] = last_message
+                continue
+            if channel.id == STICKY_CHANNEL:
+                last_sent_message = await channel.send(embed=self.embed)
+                last_sent_message = await channel.send(self.only_media)
+            self.last_sent_data[channel_id] = last_sent_message
+            await asyncio.sleep(0.25)
 
     @commands.Cog.listener("on_message")
     async def sticky_message_listener(self, message: discord.Message):
+        if message.author.bot:
+            return
         if message.channel.id == STICKY_CHANNEL:
-            last_send_message: discord.Message = self.last_sent_data
+            last_send_message: discord.Message | None = self.last_sent_data.get(message.channel.id)
             if last_send_message:
                 if message.id != last_send_message.id:
                     try:
@@ -62,7 +72,17 @@ class Utilities(commands.Cog):
                     except discord.NotFound as e:
                         return
                     new_last_sent = await message.channel.send(embed=self.embed)
-                    self.last_sent_data = new_last_sent
+                    self.last_sent_data[message.channel.id] = new_last_sent
+        elif message.channel.id in STICKY_CHANNELS and message.channel.id != STICKY_CHANNEL:
+            last_send_message : discord.Message | None = self.last_sent_data.get(message.channel.id)
+            if last_send_message:
+                if message.id != last_send_message.id:
+                    try:
+                        await last_send_message.delete()
+                    except discord.NotFound as e:
+                        return
+                    new_last_sent = await message.channel.send(self.only_media)
+                    self.last_sent_data[message.channel.id] = new_last_sent 
 
     @commands.Cog.listener("on_reaction_add")
     async def reaction_add_listener(
