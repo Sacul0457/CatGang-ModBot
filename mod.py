@@ -117,6 +117,10 @@ class ModCog(commands.Cog):
         *,
         reason: str = "No reason provided.",
     ):
+        if ctx.message.attachments:
+            files = [await attachment.to_file() for attachment in ctx.message.attachments]
+        else:
+            files = []
         await ctx.message.delete()
         if ctx.message.reference:
             replied_message = ctx.message.reference.cached_message or ctx.message.reference.resolved
@@ -152,7 +156,7 @@ class ModCog(commands.Cog):
         user_embed.set_thumbnail(url=ctx.guild.icon.url)
         if not member.bot:
             try:
-                await member.send(embed=user_embed, view=AppealView())
+                await member.send(embed=user_embed, view=AppealView(), files=files)
             except discord.Forbidden:
                 pass
         channel_embed = discord.Embed(
@@ -180,7 +184,7 @@ class ModCog(commands.Cog):
         embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
         embed.set_footer(text=f"@{ctx.author}", icon_url=ctx.author.display_avatar.url)
         embed.set_thumbnail(url=member.display_avatar.url)
-        log_message = await channel.send(embed=embed)
+        log_message = await channel.send(embed=embed, files=files)
         await save_to_moddb(self.bot, case_id, member.id, 'warn', ctx.author.id, time.time(), log_message.id)
 
 
@@ -465,7 +469,7 @@ class ModCog(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, SENIOR, SACUL)
+    @commands.has_any_role(*ADMIN, SENIOR, SACUL, MODERATOR)
     async def ban(
         self,
         ctx: commands.Context,
@@ -474,6 +478,11 @@ class ModCog(commands.Cog):
         *,
         reason: str = "No reason provided.",
     ) -> None:
+
+        if ctx.message.attachments:
+            files = [await attachment.to_file() for attachment in ctx.message.attachments]
+        else:
+            files = []
         await ctx.message.delete()
         total_seconds = None
         if ctx.message.reference:
@@ -638,7 +647,7 @@ class ModCog(commands.Cog):
             user_embed.set_author(name=ctx.guild.name, icon_url=ctx.guild.icon.url)
             user_embed.set_thumbnail(url=ctx.guild.icon.url)
             try:
-                await member.send(embed=user_embed, view=AppealView())
+                await member.send(embed=user_embed, view=AppealView(), files=files)
             except discord.Forbidden:
                 pass
         try:
@@ -688,7 +697,7 @@ class ModCog(commands.Cog):
         embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
         embed.set_footer(text=f"@{ctx.author}", icon_url=ctx.author.display_avatar.url)
         embed.set_thumbnail(url=member.display_avatar.url)
-        log_message = await channel.send(embed=embed)
+        log_message = await channel.send(embed=embed, files=files)
 
         if total_seconds is not None:
             await double_query(self.bot, query_one='''INSERT INTO moddb (case_id, user_id, action, mod_id, time, log_id) VALUES (?, ?, ?, ?, ?, ?)''',
@@ -820,7 +829,7 @@ class ModCog(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, SACUL, SENIOR)
+    @commands.has_any_role(*ADMIN, SACUL, SENIOR, MODERATOR)
     async def kick(
         self,
         ctx: commands.Context,
@@ -828,6 +837,11 @@ class ModCog(commands.Cog):
         *,
         reason: str = "No reason provided.",
     ):
+
+        if ctx.message.attachments:
+            files = [await attachment.to_file() for attachment in ctx.message.attachments]
+        else:
+            files = []
         await ctx.message.delete()
 
         if ctx.message.reference:
@@ -863,7 +877,7 @@ class ModCog(commands.Cog):
         user_embed.set_thumbnail(url=ctx.guild.icon.url)
         if not member.bot:
             try:
-                await member.send(embed=user_embed)
+                await member.send(embed=user_embed, files=files)
             except discord.Forbidden:
                 pass
         try:
@@ -900,7 +914,7 @@ class ModCog(commands.Cog):
         embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
         embed.set_footer(text=f"@{ctx.author}", icon_url=ctx.author.display_avatar.url)
         embed.set_thumbnail(url=member.display_avatar.url)
-        log_message = await channel.send(embed=embed)
+        log_message = await channel.send(embed=embed, files=files)
         await save_to_moddb(self.bot, case_id, member.id, 'kick', ctx.author.id, time.time(), log_message.id)
 
 
@@ -939,6 +953,12 @@ class ModCog(commands.Cog):
         *,
         reason: str = "No reason provided.",
     ):
+        
+        if ctx.message.attachments:
+            files = [await attachment.to_file() for attachment in ctx.message.attachments]
+        else:
+            files = []
+    
         await ctx.message.delete()
 
         total_seconds = None
@@ -1062,7 +1082,7 @@ class ModCog(commands.Cog):
         user_embed.set_thumbnail(url=ctx.guild.icon.url)
         if not member.bot:
             try:
-                await member.send(embed=user_embed, view=AppealView())
+                await member.send(embed=user_embed, view=AppealView(), files=files)
             except discord.Forbidden:
                 pass
         channel_embed = discord.Embed(
@@ -1089,7 +1109,7 @@ class ModCog(commands.Cog):
         embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
         embed.set_footer(text=f"@{ctx.author}", icon_url=ctx.author.display_avatar.url)
         embed.set_thumbnail(url=member.display_avatar.url)
-        log_message = await channel.send(embed=embed)
+        log_message = await channel.send(embed=embed, files=files)
         await save_to_moddb(self.bot, case_id, member.id, 'mute', ctx.author.id, time.time(), log_message.id)
 
 
@@ -2792,4 +2812,5 @@ class JumpToCase(discord.ui.View):
                 url=f"https://discord.com/channels/{GUILD_ID}/{MOD_LOG}/{log_id}",
             )
         )
+
 
