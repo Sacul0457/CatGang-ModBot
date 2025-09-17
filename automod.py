@@ -263,16 +263,13 @@ class AutomodCog(commands.Cog):
 
     @commands.Cog.listener('on_message')
     async def media_listener(self, message: discord.Message):
-        if isinstance(message.channel,  discord.TextChannel) and message.channel.category_id and message.channel.category_id== MEDIA_CATEGORY and not message.author.bot:
+        if isinstance(message.channel,  discord.TextChannel) and message.channel.category_id and message.channel.category_id == MEDIA_CATEGORY and not message.author.bot:
             has_link : str | None = REGEX_PATTERN.search(message.content)
             if not message.attachments and has_link is None:
                 try:
                     await message.delete()
                 except discord.NotFound:
                     return
-                await message.channel.send(f"Hey {message.author.mention}, please only send media in this channel! Thanks.",
-                                        delete_after=5.0)
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutomodCog(bot))
