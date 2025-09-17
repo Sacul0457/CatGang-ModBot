@@ -86,7 +86,7 @@ class ModBot(commands.Bot):
 
 bot = ModBot()
 
-#@bot.event
+@bot.event
 async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     pass
 
