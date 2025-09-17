@@ -12,9 +12,12 @@ from discord.utils import MISSING
 from paginator import ButtonPaginator
 if TYPE_CHECKING:
     from main import ModBot
-REPORT_CHANNEL = 1352514922462052423 #change this
+
+
+REPORT_CHANNEL = 1417863590664208476
 MOD_LOG = 1411982484744175638
 SACUL = 802167689011134474
+
 
 class ReportCog(commands.Cog):
     def __init__(self, bot: ModBot) -> None:
