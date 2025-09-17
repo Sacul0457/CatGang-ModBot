@@ -55,6 +55,7 @@ class Utilities(commands.Cog):
                 continue
             if channel.id == STICKY_CHANNEL:
                 last_sent_message = await channel.send(embed=self.embed)
+            else:
                 last_sent_message = await channel.send(self.only_media)
             self.last_sent_data[channel_id] = last_sent_message
             await asyncio.sleep(0.25)
