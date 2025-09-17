@@ -15,7 +15,8 @@ from functions import save_to_appealdb, delete_from_appealdb, execute_sql
 TOKEN = os.getenv("TOKEN")
 STAFF_ROLE = 1336377690168758342
 
-cogs = ("mod", "logs", "automod", "utilities", "appeals")
+cogs = ("mod", "logs", "automod", "utilities", "appeals", "reports")
+
 
 async def main():
     async with asqlite.connect("mod.db") as conn:
@@ -75,6 +76,8 @@ class ModBot(commands.Bot):
             except Exception as e:
                 print(f"An error occurred: {e}")
         asyncio.get_event_loop().set_debug(True)
+        self.tree.add_command(Appeal())
+        self.tree.add_command(Cog())
 
     async def close(self):
         await self.mod_pool.close()
@@ -83,9 +86,19 @@ class ModBot(commands.Bot):
 
 bot = ModBot()
 
-@bot.event
+#@bot.event
 async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     pass
+
+
+@bot.command()
+async def sync(ctx: commands.Context) -> None:
+    if ctx.author.id != 802167689011134474:
+        return
+    await ctx.message.delete()
+    synced = await bot.tree.sync()
+    await ctx.send(f"Successfully synced {len(synced)} commands", delete_after=5.0)
+
 
 @app_commands.guild_only()
 class Appeal(app_commands.Group):
@@ -99,7 +112,7 @@ class Appeal(app_commands.Group):
         await interaction.response.defer(ephemeral=True)
         async with bot.mod_pool.acquire() as conn:
             row = await conn.execute('''SELECT user_id, action FROM appealdb WHERE thread_id = ?''',
-                            (thread.id))
+                            (thread.id, ))
             result = await row.fetchone()
 
         if result is None:
@@ -131,6 +144,7 @@ class Appeal(app_commands.Group):
         await interaction.followup.send(f"Successfully removed {thread.id} from the DB.")
 
 
+@app_commands.guild_only()
 class Cog(app_commands.Group):
     def __init__(self):
         super().__init__(name="cog", description="Cog debugging", default_permissions=discord.Permissions(administrator=True))
@@ -138,7 +152,7 @@ class Cog(app_commands.Group):
 
     @app_commands.command(name='load', description='Load a cog')
     @app_commands.describe(cog = "The cog to load")
-    async def cog_load(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod']) -> None:
+    async def cog_load(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod', 'reports']) -> None:
         if interaction.user.id != 802167689011134474:
             return
         await interaction.response.defer(ephemeral=True)
@@ -149,7 +163,7 @@ class Cog(app_commands.Group):
 
     @app_commands.command(name='reload', description='Reload a cog')
     @app_commands.describe(cog = "The cog to reload")
-    async def appeal_reload(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod']) -> None:
+    async def appeal_reload(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod', 'reports']) -> None:
         if interaction.user.id != 802167689011134474:
             return
         await interaction.response.defer(ephemeral=True)
@@ -159,14 +173,16 @@ class Cog(app_commands.Group):
 
     @app_commands.command(name='unload', description='Unload a cog')
     @app_commands.describe(cog = "The cog to unload")
-    async def appeal_unload(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod']) -> None:
+    async def appeal_unload(self, interaction: discord.Interaction, cog: typing.Literal['appeals', 'mod', 'logs', 'utilities', 'automod', 'reports']) -> None:
         if interaction.user.id != 802167689011134474:
             return
         await interaction.response.defer(ephemeral=True)
         await bot.unload_extension(cog)
         await interaction.followup.send(f"Successfully unloaded: {cog}")
 
+
 @bot.tree.command(name='evalsql', description="Execute an sql query")
+@app_commands.guild_only()
 @app_commands.default_permissions(manage_guild=True)
 @app_commands.describe(query = "The query to execute")
 async def evalsql(interaction: discord.Interaction, query: str):
