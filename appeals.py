@@ -548,3 +548,4 @@ class AcceptDenyView(discord.ui.LayoutView):
         
         return any(role.id == APPEAL_STAFF for role in interaction.user.roles)
 
+
