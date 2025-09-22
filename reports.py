@@ -6,17 +6,33 @@ from discord import app_commands
 import datetime
 from typing import TYPE_CHECKING
 import re
+from json import loads
 
 from functions import get_field_content, get_user_id_from_avatar
 from discord.utils import MISSING
 from paginator import ButtonPaginator
 if TYPE_CHECKING:
     from main import ModBot
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
+
+# Build full path to the file
+CONFIG_PATH = BASE_DIR / "config.json"
+def load_config():
+    with open(CONFIG_PATH, 'r') as f:
+        data = f.read()
+        return loads(data)
 
 
-REPORT_CHANNEL = 1417863590664208476
-MOD_LOG = 1411982484744175638
-SACUL = 802167689011134474
+data = load_config()
+roles_data = data['roles']
+channel_guild_data = data['channel_guild']
+
+GUILD_ID = channel_guild_data['GUILD_ID']
+MOD_LOG = channel_guild_data['MOD_LOG']
+SACUL = roles_data['SACUL']
+REPORT_CHANNEL = channel_guild_data['REPORT_CHANNEL']
 
 
 class ReportCog(commands.Cog):
@@ -215,11 +231,10 @@ class AcceptDenyView(discord.ui.View):
                                 \n**Comments:** {comments.removeprefix('>>> ') if comments else "None"}\
                                 {f"\n**Reported Message:** {reported_message.removeprefix('>>> ')}" if reported_message else ''}")
         if isinstance(reported_by, discord.Member) and not reported_by.bot:
-            print("sending")
             try:
                 await reported_by.send(embed=user_embed)
             except discord.Forbidden:
-                passs
+                pass
         log_channel = interaction.guild.get_channel(MOD_LOG)
         log_embed = discord.Embed(title="Report Accepted",
                                   description=f">>> **User:** {user.mention} ({user.id})\
