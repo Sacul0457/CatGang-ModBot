@@ -12,18 +12,35 @@ from typing import TYPE_CHECKING
 from functions import save_to_moddb, double_query, convert_to_base64
 if TYPE_CHECKING:
     from main import ModBot
+from json import loads
 
-
-MOD_LOG = 1411982484744175638
-NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
-MODERATOR = 1319214233803816960
-SENIOR = 1343556008223707156
-ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 1343579448020308008)
-SACUL = 1294291057437048843
-GUILD_ID = 1319213192064536607
-
-MEDIA_CATEGORY= 1340256351317790730
 REGEX_PATTERN = re.compile(r'https?:\/\/[^\s/$.?#].[^\s]*')
+
+
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
+
+# Build full path to the file
+CONFIG_PATH = BASE_DIR / "config.json"
+def load_config():
+    with open(CONFIG_PATH, 'r') as f:
+        data = f.read()
+        return loads(data)
+    
+data = load_config()
+roles_data = data['roles']
+channel_guild_data = data['channel_guild']
+MODERATOR = roles_data['MODERATOR']
+ADMIN = roles_data['ADMIN']
+SACUL = roles_data['SACUL']
+SENIOR = roles_data['SENIOR']
+
+GUILD_ID = channel_guild_data['GUILD_ID']
+MOD_LOG = channel_guild_data['MOD_LOG']
+MEDIA_CATEGORY = channel_guild_data['MEDIA_CATEGORY_ID']
+ 
+
 
 class AutomodCog(commands.Cog):
     def __init__(self, bot: ModBot):
@@ -270,6 +287,7 @@ class AutomodCog(commands.Cog):
                     await message.delete()
                 except discord.NotFound:
                     return
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutomodCog(bot))
