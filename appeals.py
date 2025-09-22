@@ -7,29 +7,36 @@ from uuid import uuid4
 import time
 import base64
 from functions import save_to_appealdb, delete_from_appealdb, save_to_moddb, double_query, convert_to_base64
+from json import loads
 if TYPE_CHECKING:
     from main import ModBot
 from paginator import ButtonPaginator
+
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
+
+# Build full path to the file
+CONFIG_PATH = BASE_DIR / "config.json"
+def load_config():
+    with open(CONFIG_PATH, 'r') as f:
+        data = f.read()
+        return loads(data)
     
+data = load_config()
+roles_data = data['roles']
+channel_guild_data = data['channel_guild']
+MODERATOR = roles_data['MODERATOR']
+APPEAL_STAFF = roles_data['APPEAL_STAFF']
+ADMIN = roles_data['ADMIN']
+SACUL = roles_data['SACUL']
+SENIOR = roles_data['SENIOR']
+APPEAL_STAFF_LEADER = roles_data['APPEAL_STAFF_LEADER']
 
-MAIN_SERVER = 1319213192064536607
-APPEAL_SERVER = 1342763981370298409
-
-APPEAL_CHANNEL = 1353850807719694439
-MOD_LOG = 1411982484744175638
-
-APPEAL_STAFF_LEADER = 1344364861659943025
-APPEAL_STAFF = 1353836099214119002
-NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
-MODERATOR = 1319214233803816960
-SENIOR = 1343556008223707156
-ADMIN = (
-    1319213465390284860,
-    1343556153657004074,
-    1356640586123448501,
-    1343579448020308008,
-)
-SACUL = 1294291057437048843
+MAIN_SERVER = channel_guild_data['GUILD_ID']
+MOD_LOG = channel_guild_data['MOD_LOG']
+APPEAL_SERVER = channel_guild_data['APPEAL_SERVER'] 
+APPEAL_CHANNEL = channel_guild_data['APPEAL_CHANNEL']
 
 
 class AppealCog(commands.Cog):
@@ -39,7 +46,7 @@ class AppealCog(commands.Cog):
         self.bot.add_view(AcceptDenyView())
     
     @commands.command(name="setup_appeal")
-    @commands.has_any_role(APPEAL_STAFF_LEADER)
+    @commands.has_any_role(*APPEAL_STAFF_LEADER)
     @commands.guild_only()
     async def setup_appeal(self, ctx: commands.Context) -> None:
         await ctx.message.delete()
@@ -547,5 +554,3 @@ class AcceptDenyView(discord.ui.LayoutView):
     async def interaction_check(self, interaction: discord.Interaction):
         
         return any(role.id == APPEAL_STAFF for role in interaction.user.roles)
-
-
