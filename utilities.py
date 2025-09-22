@@ -60,11 +60,11 @@ class Utilities(commands.Cog):
             try:
                 last_message_id = channel.last_message_id or 0
                 last_message = await channel.fetch_message(last_message_id)
+                if last_message.author == self.bot.user:
+                    self.last_sent_data[channel_id] = last_message
+                    continue
             except discord.NotFound:
                 pass
-            if last_message.author == self.bot.user:
-                self.last_sent_data[channel_id] = last_message
-                continue
             if channel.id == STICKY_CHANNEL:
                 last_sent_message = await channel.send(embed=self.embed)
             else:
