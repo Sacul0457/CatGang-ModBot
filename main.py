@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 import asqlite
 import os
+from discord.ui.item import Item
 from discord.utils import MISSING
 from dotenv import load_dotenv
 load_dotenv()
@@ -10,8 +11,15 @@ import asyncio
 from paginator import ButtonPaginator
 import typing
 from functions import save_to_appealdb, delete_from_appealdb, execute_sql
+import aiofiles
+from pathlib import Path
 
 
+from json import loads, dumps
+BASE_DIR = Path(__file__).parent
+
+# Build full path to the file
+CONFIG_PATH = BASE_DIR / "config.json"
 TOKEN = os.getenv("TOKEN")
 STAFF_ROLE = 1336377690168758342
 
@@ -69,6 +77,7 @@ class ModBot(commands.Bot):
 
     async def setup_hook(self):
         self.mod_pool = await asqlite.create_pool("mod.db", size=5)
+
         for cog in cogs:
             try:
                 await self.load_extension(cog)
@@ -83,13 +92,19 @@ class ModBot(commands.Bot):
         await self.mod_pool.close()
         await super().close()
 
+    async def reload_all_configs(self) -> None:
+        for cog in cogs:
+            try:
+                await self.reload_extension(cog)
+            except Exception as e:
+                print(e)
+
 
 bot = ModBot()
 
-@bot.event
+#@bot.event
 async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     pass
-
 
 @bot.command()
 async def sync(ctx: commands.Context) -> None:
@@ -98,7 +113,6 @@ async def sync(ctx: commands.Context) -> None:
     await ctx.message.delete()
     synced = await bot.tree.sync()
     await ctx.send(f"Successfully synced {len(synced)} commands", delete_after=5.0)
-
 
 @app_commands.guild_only()
 class Appeal(app_commands.Group):
@@ -180,7 +194,6 @@ class Cog(app_commands.Group):
         await bot.unload_extension(cog)
         await interaction.followup.send(f"Successfully unloaded: {cog}")
 
-
 @bot.tree.command(name='evalsql', description="Execute an sql query")
 @app_commands.guild_only()
 @app_commands.default_permissions(manage_guild=True)
@@ -194,6 +207,152 @@ async def evalsql(interaction: discord.Interaction, query: str):
     except Exception as e:
         return await interaction.followup.send(f"An error occurred: {e}")
     await interaction.followup.send(f"Result: ```json\n{result}```")
+
+
+class RoleModals(discord.ui.Modal):
+    def __init__(self) -> None:
+        super().__init__(title="Edit Roles", timeout=None, custom_id="edit_roles_modal")
+        self.role_type = discord.ui.Label(text="Role Type", description="What should this role be (e.g staff role, senior mod role etc)",
+                                          component=discord.ui.Select(options=[discord.SelectOption(label="Moderator", value="MODERATOR"),
+                                                                               discord.SelectOption(label="Senior Moderator", value="SENIOR"),
+                                                                               discord.SelectOption(label="Admin", value="ADMIN"),
+                                                                               ], required=True))
+        self.roles = discord.ui.Label(text="New Role", description="What this role should be in the config",
+                                      component=discord.ui.RoleSelect(max_values=5, min_values=1))
+        
+        self.add_item(self.role_type)
+        self.add_item(self.roles)
+    
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        role_type: str = self.role_type.component.values[0] #type: ignore
+
+        async with aiofiles.open(CONFIG_PATH, "r") as f:
+            text = await f.read()
+            data = loads(text)
+
+        
+        chosen_roles = [int(value) for value in self.roles.component.values]
+        data['roles'][f"{role_type}"] = chosen_roles
+
+        async with aiofiles.open(CONFIG_PATH, "w") as f:
+            to_write = dumps(data, indent=3)
+            await f.write(to_write)
+            
+
+        role_mentions = ",".join([f"<@&{role_id}>" for role_id in chosen_roles])
+        embed = discord.Embed(title="Role Config Updated",
+                              description=f"- {role_mentions} is now the `{role_type}` role.",
+                              color=discord.Color.brand_green())
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        await bot.reload_all_configs()
+
+
+class ChannelModals(discord.ui.Modal):
+    def __init__(self) -> None:
+        super().__init__(title="Edit Channels", timeout=None, custom_id="edit_channel_modal")
+        self.channel_type = discord.ui.Label(text="Channel Type", description="What should this channel be (e.g logs, mod logs etc)",
+                                          component=discord.ui.Select(options=[discord.SelectOption(label="Mod Logs", value="MOD_LOG"),
+                                                                               discord.SelectOption(label="Appeal Channel", value="APPEAL_CHANNEL"),
+                                                                               discord.SelectOption(label="Event Logs", value="EVENTS_LOGS"),
+                                                                               discord.SelectOption(label="Management Logs", value="MANAGEMENT"),
+                                                                               ], required=True))
+        self.channels = discord.ui.Label(text="New Channel", description="What this channel should be in the config",
+                                      component=discord.ui.ChannelSelect(max_values=1, min_values=1, channel_types=[discord.ChannelType.text]))
+        
+        self.add_item(self.channel_type)
+        self.add_item(self.channels)
+    
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        channel_type: str = self.channel_type.component.values[0] #type: ignore
+
+        async with aiofiles.open(CONFIG_PATH, "r") as f:
+            text = await f.read()
+            data = loads(text)
+
+        chosen_channel: int = int(self.channels.component.values[0])
+        data['channel_guild'][channel_type] = chosen_channel
+
+        async with aiofiles.open(CONFIG_PATH, "w") as f:
+            to_write = dumps(data, indent=3)
+            await f.write(to_write)
+            
+        embed = discord.Embed(title="Channel Config Updated",
+                              description=f"- <#{chosen_channel}> is now the `{channel_type}` channel.",
+                              color=discord.Color.brand_green())
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        await bot.reload_all_configs()
+
+class ConfigContainer(discord.ui.Container):
+    def __init__(self, children: list[discord.ui.Item]) -> None:
+        super().__init__(*children)
+
+class EditRoleButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(style=discord.ButtonStyle.gray, label="Edit", custom_id="edit_roles_button")
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_modal(RoleModals())
+
+class EditChannelButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(style=discord.ButtonStyle.gray, label="Edit", custom_id="edit_channels_button")
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_modal(ChannelModals())
+
+class ShowConfigButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(style=discord.ButtonStyle.gray, label="View", custom_id="show_config_button")
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        async with aiofiles.open(CONFIG_PATH, "r") as f:
+            text = await f.read()
+            data = loads(text)
+        roles_data = data['roles']
+        channels_data = data['channel_guild']
+
+
+        moderator_roles = ", ".join(f"<@&{role_id}>" for role_id in roles_data['MODERATOR'])
+        senior_moderator_roles = ", ".join(f"<@&{role_id}>" for role_id in roles_data['SENIOR'])
+        admin_roles = ", ".join(f"<@&{role_id}>" for role_id in roles_data['ADMIN'])
+        appeal_staff_roles = ", ".join(f"<@&{role_id}>" for role_id in roles_data['APPEAL_STAFF'])
+
+        mod_log = (f"<#{channels_data['MOD_LOG']}>")
+        event_logs = (f"<#{channels_data['EVENTS_LOGS']}>")
+        management_logs = (f"<#{channels_data['MANAGEMENT']}>")
+        appeal_channel = (f"<#{channels_data['APPEAL_CHANNEL']}>")
+
+        embed = discord.Embed(title="Configs")
+        embed.add_field(name="Roles",
+                        value=f">>> Moderator Roles: {moderator_roles}\nSnr Moderator Roles: {senior_moderator_roles}\
+                            \nAdmin Roles: {admin_roles}\nAppeal Staff Roles: {appeal_staff_roles}")
+        embed.add_field(name="Channels",
+                        value=f">>> Mod Log: {mod_log}\nEvent Log: {event_logs}\nManagement Log: {management_logs}\nAppeal Channel: {appeal_channel}")
+
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+class ConfigView(discord.ui.LayoutView):
+    def __init__(self, action: str) -> None:
+        super().__init__(timeout=None)
+        if action == "basic_config":
+            header = discord.ui.TextDisplay("## Config Menu")
+            separator1 = discord.ui.Separator()
+            edit_role_accessory = discord.ui.Section("Role Configs", accessory=EditRoleButton())
+            edit_channel_accessory = discord.ui.Section("Channel Configs", accessory=EditChannelButton())
+            separator2 = discord.ui.Separator()
+            show_config_accessory = discord.ui.Section("Current Configs", accessory=ShowConfigButton())
+
+            self.add_item(ConfigContainer([header, separator1, edit_role_accessory, edit_channel_accessory, separator2, show_config_accessory]))
+
+@bot.tree.command(description="Configure roles and channels")
+@app_commands.default_permissions(manage_guild=True)
+async def config(interaction: discord.Interaction):
+    await interaction.response.send_message(view=ConfigView("basic_config"), ephemeral=True)
+
 
 @bot.command()
 @commands.has_role(STAFF_ROLE)
