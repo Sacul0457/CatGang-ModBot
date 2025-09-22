@@ -4,24 +4,36 @@ import asyncio
 import datetime
 import time
 from discord import app_commands
+from typing import Literal
+from json import loads
+from pathlib import Path
 
-STICKY_CHANNEL = 1383545647977726062
-SKULLBOARD_CHANNEL = 1381029891641966632
-REPLY_EMOJI_ID = 1395943993593958473
-CUSTOM_EMOJI_ID = 1319238323436388422 
+BASE_DIR = Path(__file__).parent
 
-MOD_LOG =  1411982484744175638 
-NUMBERS = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+# Build full path to the file
+CONFIG_PATH = BASE_DIR / "config.json"
 
-MODERATOR = 1319214233803816960
-SENIOR = 1343556008223707156
-ADMIN = (1319213465390284860, 1343556153657004074, 1356640586123448501, 1343579448020308008)
-SACUL = 1294291057437048843
+def load_config():
+    with open(CONFIG_PATH, 'r') as f:
+        data = f.read()
+        return loads(data)
+    
+data = load_config()
+roles_data = data['roles']
+channel_guild_data = data['channel_guild']
+MODERATOR = roles_data['MODERATOR']
+ADMIN = roles_data['ADMIN']
+SACUL = roles_data['SACUL']
+SENIOR = roles_data['SENIOR']
 
-GUILD_ID = 1319213192064536607
-STICKY_CHANNELS = [1383545647977726062, 1350595550223011992, 1352398956646371438, 1414630440865894400, 1350424916687589416, 1350424974623768627, 1350425018466701312, 1414627729260806205, 1414628631237365933]
-MEDIA_CATEGORY_ID = 1340256351317790730
-
+GUILD_ID = channel_guild_data['GUILD_ID']
+MOD_LOG = channel_guild_data['MOD_LOG']
+MEDIA_CATEGORY_ID = channel_guild_data['MEDIA_CATEGORY_ID']
+STICKY_CHANNEL = channel_guild_data['STICKY_CHANNEL']
+CATBOARD = channel_guild_data['CATBOARD']
+REPLY_EMOJI_ID = channel_guild_data['REPLY_EMOJI_ID']
+CUSTOM_EMOJI_ID = channel_guild_data['CUSTOM_EMOJI_ID']
+STICKY_CHANNELS = channel_guild_data['STICKY_CHANNELS']
 
 class Utilities(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -85,6 +97,7 @@ class Utilities(commands.Cog):
                     new_last_sent = await message.channel.send(self.only_media)
                     self.last_sent_data[message.channel.id] = new_last_sent 
 
+
     @commands.Cog.listener("on_reaction_add")
     async def reaction_add_listener(
         self, reaction: discord.Reaction, user: discord.Member | discord.User
@@ -95,7 +108,7 @@ class Utilities(commands.Cog):
                 and reaction.message.id not in self.already_added
                 and reaction.count == 3
             ):
-                channel = reaction.message.guild.get_channel(SKULLBOARD_CHANNEL)
+                channel = reaction.message.guild.get_channel(CATBOARD)
                 if reaction.message.reference and not reaction.message.flags.forwarded:
                     replied_message = (
                         reaction.message.reference.cached_message
@@ -289,3 +302,4 @@ class SayDmView(discord.ui.LayoutView):
             self.add_item(DMContainer(messageable, message, attachments))
         else:
             self.add_item(SayContainer(messageable, message, attachments)) 
+
