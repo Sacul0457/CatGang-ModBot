@@ -3,8 +3,6 @@ from discord.ext import commands
 from discord import app_commands
 import asqlite
 import os
-from discord.ui.item import Item
-from discord.utils import MISSING
 from dotenv import load_dotenv
 load_dotenv()
 import asyncio
@@ -13,7 +11,7 @@ import typing
 from functions import save_to_appealdb, delete_from_appealdb, execute_sql
 import aiofiles
 from pathlib import Path
-
+import psutil
 
 from json import loads, dumps
 BASE_DIR = Path(__file__).parent
@@ -113,6 +111,25 @@ async def sync(ctx: commands.Context) -> None:
     await ctx.message.delete()
     synced = await bot.tree.sync()
     await ctx.send(f"Successfully synced {len(synced)} commands", delete_after=5.0)
+
+@bot.command()
+@commands.has_guild_permissions(manage_guild=True)
+async def stats(ctx: commands.Context) -> None:
+    cpu_count = psutil.cpu_count()
+    cpu_percent = psutil.cpu_percent(interval=None)
+    memory = psutil.virtual_memory()
+    total = int(memory.total / (1024 ** 3))
+    available = int(memory.available / (1024 ** 3))
+    percent = memory.percent
+    used = int(memory.used / (1024 ** 3))
+    embed = discord.Embed(title="Bot Stats",
+                          description=f">>> - CPU Count: {cpu_count}\n- CPU: {cpu_percent}%\
+                        \n- Total: {total}GB\n- Available: {available}GB\
+                        \n- Used: {used}GB ({percent}%)",
+                          color=discord.Color.blurple())
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
+    await ctx.send(embed=embed)
+
 
 @app_commands.guild_only()
 class Appeal(app_commands.Group):
