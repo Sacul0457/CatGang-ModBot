@@ -1,0 +1,5 @@
+discord.py == 2.6.3
+asqlite
+python-dotenv
+aiofiles
+psutil
