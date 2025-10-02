@@ -230,7 +230,7 @@ class AcceptDenyView(discord.ui.View):
         user_embed.add_field(name="Your Report",
                              value=f">>> **User:** {user.mention}\
                                 \n**Reason:** {reason.removeprefix('>>> ')}\
-                                \n**Comments:** {comments.removeprefix('>>> ') if comments else "None"}s")
+                                \n**Comments:** {comments.removeprefix('>>> ') if comments else "None"}")
         if isinstance(reported_by, discord.Member) and not reported_by.bot:
             try:
                 await reported_by.send(embed=user_embed)
@@ -380,7 +380,8 @@ class DenyModal(discord.ui.Modal):
         reported_message = get_field_content(embed, "Message Reported")
 
         user_embed = discord.Embed(title="Report Denied",
-                                   description=f"- Your report from {discord.utils.format_dt(interaction.message.created_at, 'R')} has been denied.",
+                                   description=f"- Your report from {discord.utils.format_dt(interaction.message.created_at, 'R')} has been denied.\
+                                    \nDeny reason: {deny_reason}",
                                    color=discord.Color.brand_red(),
                                    timestamp=discord.utils.utcnow())
         user_embed.add_field(name="Your Report",
