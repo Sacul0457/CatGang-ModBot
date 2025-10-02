@@ -26,7 +26,7 @@ SENIOR = roles_data['SENIOR']
 GUILD_ID = channel_guild_data['GUILD_ID']
 EVENTS_LOGS = channel_guild_data['EVENTS_LOGS']
 BLACK_LISTED_CHANNELS = channel_guild_data['BLACK_LISTED_CHANNELS']
-MANAGEMENT = channel_guild_data['EVENTS_LOGS'] 
+MANAGEMENT = channel_guild_data['MANAGEMENT'] 
 
 class LogCogs(commands.Cog):
     def __init__(self, bot:commands.Bot):
@@ -48,9 +48,8 @@ class LogCogs(commands.Cog):
         if message.guild:
             async for entry in message.guild.audit_logs(action=discord.AuditLogAction.message_delete, limit=1):
                 if entry and entry.target and entry.target.id == message.author.id:
-                    mod = message.guild.get_member(entry.user_id) #type: ignore
-                    if mod is not None:
-                        embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
+                    if entry.user is not None:
+                        embed.set_footer(text=f"Deleted by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
         channel = self.bot.get_channel(EVENTS_LOGS)
         if channel:
@@ -93,10 +92,9 @@ class LogCogs(commands.Cog):
                                 timestamp=discord.utils.utcnow())
         async for entry in messages[0].guild.audit_logs(action=discord.AuditLogAction.message_bulk_delete, limit=3):
             if entry.target.id == messages[0].channel.id:
-                mod = messages[0].guild.get_member(entry.user_id)
-                if mod is None:
+                if entry.user is None:
                     break
-                embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
+                embed.set_footer(text=f"Deleted by @{entry.user}", icon_url=entry.user.display_avatar.url)
                 break
         channel = self.bot.get_channel(EVENTS_LOGS)
         await channel.send(embed=embed)
@@ -115,10 +113,9 @@ class LogCogs(commands.Cog):
                 embed.set_author(name=f"@{after_member}", icon_url=after_member.display_avatar.url)
                 async for entry in after_member.guild.audit_logs(action=discord.AuditLogAction.member_role_update, limit=3):
                     if entry.target.id == after_member.id:
-                        mod = after_member.guild.get_member(entry.user_id)
-                        if mod is None:
+                        if entry.user is None:
                             break
-                        embed.set_footer(text=f"Added by @{mod}", icon_url=mod.display_avatar.url)
+                        embed.set_footer(text=f"Added by @{entry.user}", icon_url=entry.user.display_avatar.url)
                         break
             else:
                 role_removed : list[discord.Role] = [role for role in before_member.roles if role not in after_member.roles and role != after_member.guild.default_role]
@@ -129,10 +126,9 @@ class LogCogs(commands.Cog):
                 embed.set_author(name=f"@{after_member}", icon_url=after_member.display_avatar.url)
                 async for entry in after_member.guild.audit_logs(action=discord.AuditLogAction.member_role_update, limit=3):
                     if entry.target.id == after_member.id:
-                        mod = after_member.guild.get_member(entry.user_id)
-                        if mod is None:
+                        if entry.user is None:
                             break
-                        embed.set_footer(text=f"Removed by @{mod}", icon_url=mod.display_avatar.url)
+                        embed.set_footer(text=f"Removed by @{entry.user}", icon_url=entry.user.display_avatar.url)
                         break
             channel = self.bot.get_channel(MANAGEMENT)
             await channel.send(embed=embed)
@@ -145,10 +141,9 @@ class LogCogs(commands.Cog):
             embed.set_thumbnail(url=after_member.display_avatar.url)
             async for entry in after_member.guild.audit_logs(action=discord.AuditLogAction.member_update, limit=3):
                 if entry.target.id == after_member.id:
-                    mod = after_member.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Changed by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Changed by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
             channel = self.bot.get_channel(EVENTS_LOGS)
             await channel.send(embed=embed)
@@ -164,10 +159,9 @@ class LogCogs(commands.Cog):
                               timestamp=discord.utils.utcnow())
         async for entry in role.guild.audit_logs(action=discord.AuditLogAction.role_create, limit=1):
             if entry.target.id == role.id:
-                mod = role.guild.get_member(entry.user_id)
-                if mod is None:
+                if entry.user is None:
                     break
-                embed.set_footer(text=f"Created by @{mod}", icon_url=mod.display_avatar.url)
+                embed.set_footer(text=f"Created by @{entry.user}", icon_url=entry.user.display_avatar.url)
                 break
         await channel.send(embed=embed)
 
@@ -182,10 +176,9 @@ class LogCogs(commands.Cog):
                               timestamp=discord.utils.utcnow())
         async for entry in role.guild.audit_logs(action=discord.AuditLogAction.role_delete, limit=1):
             if entry.target.id == role.id:
-                mod = role.guild.get_member(entry.user_id)
-                if mod is None:
+                if entry.user is None:
                     break
-                embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
+                embed.set_footer(text=f"Deleted by @{entry.user}", icon_url=entry.user.display_avatar.url)
                 break
         await channel.send(embed=embed)
 
@@ -200,10 +193,9 @@ class LogCogs(commands.Cog):
                                   color=discord.Color.blurple())
             async for entry in after_role.guild.audit_logs(action=discord.AuditLogAction.role_update, limit=1):
                 if entry.target.id == after_role.id:
-                    mod = after_role.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Hoisted by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Hoisted by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
             channel = self.bot.get_channel(MANAGEMENT)
             await channel.send(embed=embed)
@@ -214,10 +206,9 @@ class LogCogs(commands.Cog):
                                   color=discord.Color.blurple())
             async for entry in after_role.guild.audit_logs(action=discord.AuditLogAction.role_update, limit=1):
                 if entry.target.id == after_role.id:
-                    mod = after_role.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Unhoisted by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Unhoisted by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
             channel = self.bot.get_channel(MANAGEMENT)
             await channel.send(embed=embed)
@@ -247,10 +238,9 @@ class LogCogs(commands.Cog):
                                     value=f"\n>>> - {removed_perms}",) 
             async for entry in after_role.guild.audit_logs(action=discord.AuditLogAction.role_update, limit=1):
                 if entry.target.id == after_role.id:
-                    mod = after_role.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Updated by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Updated by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
             await channel.send(embed=embed)
         elif before_role.color != after_role.color:
@@ -264,10 +254,9 @@ class LogCogs(commands.Cog):
                                        color=before_role.color)
             async for entry in after_role.guild.audit_logs(action=discord.AuditLogAction.role_update, limit=1):
                 if entry.target.id == after_role.id:
-                    mod = after_role.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embedafter.set_footer(text=f"Changed by @{mod}", icon_url=mod.display_avatar.url)
+                    embedafter.set_footer(text=f"Changed by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
             channel = self.bot.get_channel(MANAGEMENT)
             await channel.send(embeds=[embedafter, embedbefore])
@@ -278,12 +267,24 @@ class LogCogs(commands.Cog):
                                        color=after_role.color)
             async for entry in after_role.guild.audit_logs(action=discord.AuditLogAction.role_update, limit=1):
                 if entry.target.id == after_role.id:
-                    mod = after_role.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Changed by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Changed by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
             channel = self.bot.get_channel(MANAGEMENT)
+        elif before_role.position != after_role.position:
+            embed = discord.Embed(title="Role Position Changed",
+                                       description=f">>> **Role:** {after_role.mention}\n**New postion:** `{after_role.position}`\n**Old position:** `{before_role.position}`",
+                                       timestamp=discord.utils.utcnow(),
+                                       color=after_role.color)
+            async for entry in after_role.guild.audit_logs(action=discord.AuditLogAction.role_update, limit=1):
+                if entry.target.id == after_role.id:
+                    if entry.user is None:
+                        break
+                    embed.set_footer(text=f"Changed by @{entry.user}", icon_url=entry.user.display_avatar.url)
+                    break
+            channel = self.bot.get_channel(MANAGEMENT)
+            await channel.send(embed=embed)
 
 
     @commands.Cog.listener("on_guild_channel_create")
@@ -297,10 +298,9 @@ class LogCogs(commands.Cog):
                                 color=discord.Color.brand_green())
             async for entry in channel.guild.audit_logs(action=discord.AuditLogAction.channel_create, limit=1):
                 if entry.target.id == channel.id:
-                    mod = channel.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Created by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Created by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
         else:
             embed = discord.Embed(title="Channel Created",
@@ -309,10 +309,9 @@ class LogCogs(commands.Cog):
                                 color=discord.Color.brand_green())
             async for entry in channel.guild.audit_logs(action=discord.AuditLogAction.channel_create, limit=1):
                 if entry.target.id == channel.id:
-                    mod = channel.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Created by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Created by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
         channel = self.bot.get_channel(MANAGEMENT)
         await channel.send(embed=embed)
@@ -328,10 +327,9 @@ class LogCogs(commands.Cog):
                                 color=discord.Color.brand_red())
             async for entry in channel.guild.audit_logs(action=discord.AuditLogAction.channel_delete, limit=1):
                 if entry.target.id == channel.id:
-                    mod = channel.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Deleted by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
         else:
             embed = discord.Embed(title="Channel Deleted",
@@ -340,10 +338,9 @@ class LogCogs(commands.Cog):
                                 color=discord.Color.brand_red())
             async for entry in channel.guild.audit_logs(action=discord.AuditLogAction.channel_delete, limit=1):
                 if entry.target.id == channel.id:
-                    mod = channel.guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Deleted by @{entry.user}", icon_url=entry.user.display_avatar.url)
                     break
         channel = self.bot.get_channel(MANAGEMENT)
         await channel.send(embed=embed)
@@ -363,10 +360,9 @@ class LogCogs(commands.Cog):
                                         color=discord.Color.blurple())
                 async for entry in after_channel.guild.audit_logs(action=discord.AuditLogAction.channel_update, limit=1):
                     if entry.target.id == after_channel.id:
-                        mod = after_channel.guild.get_member(entry.user_id)
-                        if mod is None:
+                        if entry.user is None:
                             break
-                        embed.set_footer(text=f"Changed by @{mod}", icon_url=mod.display_avatar.url)
+                        embed.set_footer(text=f"Changed by @{entry.user}", icon_url=entry.user.display_avatar.url)
                         break
                 channel = self.bot.get_channel(MANAGEMENT)
                 await channel.send(embed=embed)
@@ -378,10 +374,9 @@ class LogCogs(commands.Cog):
                                         color=discord.Color.blurple())
                 async for entry in after_channel.guild.audit_logs(action=discord.AuditLogAction.channel_update, limit=1):
                     if entry.target.id == after_channel.id:
-                        mod = after_channel.guild.get_member(entry.user_id)
-                        if mod is None:
+                        if entry.user is None:
                             break
-                        embed.set_footer(text=f"Changed by @{mod}", icon_url=mod.display_avatar.url)
+                        embed.set_footer(text=f"Changed by @{entry.user}", icon_url=entry.user.display_avatar.url)
                         break
                 channel = self.bot.get_channel(MANAGEMENT)
                 await channel.send(embed=embed)
@@ -397,10 +392,9 @@ class LogCogs(commands.Cog):
                                         color=discord.Color.blurple())
                 async for entry in after_channel.guild.audit_logs(action=discord.AuditLogAction.channel_update, limit=1):
                     if entry.target.id == after_channel.id:
-                        mod = after_channel.guild.get_member(entry.user_id)
-                        if mod is None:
+                        if entry.user is None:
                             break
-                        embed.set_footer(text=f"Changed by @{mod}", icon_url=mod.display_avatar.url)
+                        embed.set_footer(text=f"Changed by @{entry.user}", icon_url=entry.user.display_avatar.url)
                         break
                 channel = self.bot.get_channel(MANAGEMENT)
                 await channel.send(embed=embed)
@@ -421,10 +415,9 @@ class LogCogs(commands.Cog):
                                   timestamp=discord.utils.utcnow())
             async for entry in guild.audit_logs(action=discord.AuditLogAction.emoji_update, limit=1):
                 if entry.target.id == new_emoji.id:
-                    mod = guild.get_member(entry.user_id)
-                    if mod is None:
+                    if entry.user is None:
                         break
-                    embed.set_footer(text=f"Updated by @{mod}", icon_url=mod.display_avatar.url)
+                    embed.set_footer(text=f"Updated by @{entry.user}", icon_url=entry.user.display_avatar.url)
             embed.set_thumbnail(url=new_emoji.url)
             channel = guild.get_channel(EVENTS_LOGS)
             await channel.send(embed=embed)
@@ -442,10 +435,9 @@ class LogCogs(commands.Cog):
                 embed.set_thumbnail(url=emoji.url)
                 async for entry in guild.audit_logs(action=discord.AuditLogAction.emoji_create, limit=1):
                     if entry.target.id == emoji.id:
-                        mod = guild.get_member(entry.user_id)
-                        if mod is None:
+                        if entry.user is None:
                             break
-                        embed.set_footer(text=f"Created by @{mod}", icon_url=mod.display_avatar.url)
+                        embed.set_footer(text=f"Created by @{entry.user}", icon_url=entry.user.display_avatar.url)
                 channel = guild.get_channel(EVENTS_LOGS)
                 await channel.send(embed=embed)
             else:
@@ -458,10 +450,9 @@ class LogCogs(commands.Cog):
                 embed.set_thumbnail(url=emoji.url)
                 async for entry in guild.audit_logs(action=discord.AuditLogAction.emoji_delete, limit=1):
                     if entry.target.id == emoji.id:
-                        mod = guild.get_member(entry.user_id)
-                        if mod is None:
+                        if entry.user is None:
                             break
-                        embed.set_footer(text=f"Deleted by @{mod}", icon_url=mod.display_avatar.url)
+                        embed.set_footer(text=f"Deleted by @{entry.user}", icon_url=entry.user.display_avatar.url)
                 channel = guild.get_channel(EVENTS_LOGS)
                 await channel.send(embed=embed)
 
