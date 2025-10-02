@@ -69,7 +69,7 @@ class AutomodCog(commands.Cog):
             await self.purge_messages(message.author, message.channel)
 
     async def purge_messages(
-        self, member: discord.Member | discord.User , channel: discord.TextChannel
+        self, member: discord.Member | discord.User , channel: discord.TextChannel | discord.Thread
     ):
         await asyncio.sleep(2.5)
 
@@ -78,14 +78,13 @@ class AutomodCog(commands.Cog):
 
         await channel.purge(limit=15, check=check)
         await channel.send(
-            f"{member.mention} let's avoid spamming!\
-                                    \n-# ⚠️ Repeating this can lead into a warning, please read <#1319606464264011806>.",
+            f"{member.mention} let's avoid spamming, please read <#1319606464264011806>.",
             delete_after=5.0,
         )
         await self.warn_user(member, channel)
 
     async def warn_user(
-        self, user: discord.Member | discord.User, channel: discord.TextChannel
+        self, user: discord.Member | discord.User, channel: discord.TextChannel | discord.Thread
     ) -> None:
         async with self.bot.mod_pool.acquire() as conn:
             rows = await conn.execute(
@@ -119,6 +118,7 @@ class AutomodCog(commands.Cog):
                 return print(e)
             except Exception as e:
                 print(f"An error occurred: {e}")
+                return
             log_channel = self.bot.get_channel(MOD_LOG)
             case_id = convert_to_base64()
 
@@ -204,6 +204,7 @@ class AutomodCog(commands.Cog):
                 return print(e)
             except Exception as e:
                 print(f"An error occurred: {e}")
+                return
             log_channel = self.bot.get_channel(MOD_LOG)
             case_id = convert_to_base64()
             embed = discord.Embed(
@@ -286,7 +287,7 @@ class AutomodCog(commands.Cog):
                 try:
                     await message.delete()
                 except discord.NotFound:
-                    return
+                    pass
 
 
 async def setup(bot: commands.Bot):
