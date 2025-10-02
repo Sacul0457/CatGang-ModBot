@@ -114,14 +114,16 @@ class ReportCog(commands.Cog):
                 await interaction.followup.send()
                 return
             channel = self.bot.get_partial_messageable(int(channel_id), guild_id=interaction.guild_id)
-            try:
-                message = await channel.fetch_message(int(message_id))
-            except discord.NotFound:
-                embed = discord.Embed(title="Message Not Found",
-                                      description=f"- There is no such message `{message_id}`",
-                                      color=discord.Color.brand_red())
-                await interaction.followup.send(embed=embed, ephemeral=True)
-                return
+            message = self.bot.get_message(int(message_id))
+            if message is None:
+                try:
+                    message = await channel.fetch_message(int(message_id))
+                except discord.NotFound:
+                    embed = discord.Embed(title="Message Not Found",
+                                        description=f"- There is no such message `{message_id}`",
+                                        color=discord.Color.brand_red())
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    return
             report_embed = discord.Embed(title="Member Report",
                                          description=f">>> **User:** {message.author.mention} ({message.author.id})\
                                             \n**Created on:** {discord.utils.format_dt(message.author.created_at, 'f')}\
@@ -228,7 +230,7 @@ class AcceptDenyView(discord.ui.View):
         user_embed.add_field(name="Your Report",
                              value=f">>> **User:** {user.mention}\
                                 \n**Reason:** {reason.removeprefix('>>> ')}\
-                                \n**Comments:** {comments.removeprefix('>>> ') if comments else "None"}")
+                                \n**Comments:** {comments.removeprefix('>>> ') if comments else "None"}s")
         if isinstance(reported_by, discord.Member) and not reported_by.bot:
             try:
                 await reported_by.send(embed=user_embed)
@@ -378,8 +380,7 @@ class DenyModal(discord.ui.Modal):
         reported_message = get_field_content(embed, "Message Reported")
 
         user_embed = discord.Embed(title="Report Denied",
-                                   description=f"- Your report from {discord.utils.format_dt(interaction.message.created_at, 'R')} has been denied.\
-                                    \n  - {deny_reason}",
+                                   description=f"- Your report from {discord.utils.format_dt(interaction.message.created_at, 'R')} has been denied.",
                                    color=discord.Color.brand_red(),
                                    timestamp=discord.utils.utcnow())
         user_embed.add_field(name="Your Report",
