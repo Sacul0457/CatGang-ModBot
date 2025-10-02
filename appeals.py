@@ -362,7 +362,6 @@ class AcceptButton(discord.ui.Button):
 
     async def callback(self, interaction):
         bot : ModBot = interaction.client
-        print("callback")
         owner = self.owner
         if owner is None:
             async with bot.mod_pool.acquire() as conn:
@@ -372,13 +371,12 @@ class AcceptButton(discord.ui.Button):
                 owner_id = result['user_id']
                 action = result['action']
                 
-            owner = interaction.guild.get_member(owner_id)
+            owner = bot.get_user(owner_id)
             if owner is None:
                 embed = discord.Embed(title="Member not Found",
                                       description=f"- `{owner_id}` is no longer in this server. Please close this thread manually.",
                                       color=discord.Color.brand_red())
                 return await interaction.response.send_message(embed=embed, ephemeral=True)
-        print("hello?")
         if self.action is not None:
             if self.action == 'ban':
                 await interaction.response.send_modal(AcceptBanModal(owner))
@@ -449,7 +447,6 @@ class DenyButton(discord.ui.Button):
         super().__init__(style=discord.ButtonStyle.red, label="Deny", custom_id="deny_appeal")
         self.owner = owner
     async def callback(self, interaction: discord.Interaction):
-        print("HELLO?????")
         bot : ModBot = interaction.client
         owner = self.owner
         if owner is None:
@@ -466,7 +463,6 @@ class DenyButton(discord.ui.Button):
                                     description=f"- `{owner_id}` could not be found. Please close this thread manually and ping <@802167689011134474>.",
                                     color=discord.Color.brand_red())
                 await interaction.response.send_message(embed=embed, ephemeral=True)
-        await interaction.response.send_modal(DenyModal(owner))
 
 class CasesButton(discord.ui.Button):
     def __init__(self, owner: discord.Member | discord.User):
@@ -557,4 +553,3 @@ class AcceptDenyView(discord.ui.LayoutView):
     async def interaction_check(self, interaction: discord.Interaction):
         
         return any(role_id in interaction.user._roles for role_id in APPEAL_STAFF)
-
