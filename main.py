@@ -97,12 +97,66 @@ class ModBot(commands.Bot):
             except Exception as e:
                 print(e)
 
+    def get_message(self, id: int, /) -> typing.Optional[discord.Message]:
+        """Returns a message from the cache if found."""
+        return discord.utils.find(lambda m: m.id == id, reversed(self.cached_messages)) if self.cached_messages else None
 
 bot = ModBot()
 
-#@bot.event
-async def on_command_error(ctx: commands.Context, error: commands.CommandError):
-    pass
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+    if isinstance(error, discord.app_commands.TransformerError):
+        print(error.transformer.type)
+        if error.transformer.type == discord.AppCommandOptionType.user:
+            embed = discord.Embed(title="Member Not Found",
+                                  description=f"- `{error.value}` is not a member.",
+                                  color=discord.Colour.brand_red())
+        else:
+            embed = discord.Embed(title="Transformer Error",
+                                  description=f"- {error}",
+                                  color=discord.Colour.brand_red())
+    else:
+        embed = discord.Embed(title="An Error Occurred",
+                              description=f"- {error}\n-# The developer has been notified",
+                              color=discord.Color.brand_red())
+        await handle_interaction_error(error, interaction)
+    if not interaction.is_expired() and not interaction.response.is_done():
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    else:
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+async def handle_interaction_error(error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction = None) -> None:
+    sacul = bot.get_user(802167689011134474)
+    content = f"Error: `{error}`"
+
+    if interaction:
+        interaction_created_at = interaction.created_at.timestamp()
+        now = time.time()
+        interaction_data = interaction.data or {}
+        content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> ({now - interaction_created_at:.3f}s ago)\
+            \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
+        if interaction.command and interaction.type is discord.InteractionType.application_command and interaction_data:
+            command_id = interaction_data.get('id', 0)
+            if interaction.command.parent:
+                try:
+                    options_dict = interaction_data.get("options", [])[0].get("options", []) # This is nested since it is a sub command
+                    command_mention = f"</{interaction.command.qualified_name}:{command_id}>"
+                except (IndexError, AttributeError):
+                    options_dict  = interaction_data.get("options", [])
+                    command_mention = f"</{interaction.command.name}:{command_id}>"
+            else:
+                options_dict  = interaction_data.get("options", [])
+                command_mention = f"</{interaction.command.name}:{command_id}>"
+            content += f"\nCommand: {command_mention}, inputted values:"
+
+            options_formatted = " \n".join([f"- {option.get('name', 'Unknown')}: {option.get('value', 'Unknown')}" for option in options_dict])
+            content += f"\n```{options_formatted}```"
+        else:
+            content += f"\n```json\n{interaction_data}```"
+        await sacul.send(content)
+    else:
+        await sacul.send(content=content)
+
 
 @bot.command()
 async def sync(ctx: commands.Context) -> None:
@@ -111,6 +165,7 @@ async def sync(ctx: commands.Context) -> None:
     await ctx.message.delete()
     synced = await bot.tree.sync()
     await ctx.send(f"Successfully synced {len(synced)} commands", delete_after=5.0)
+
 
 @bot.command()
 @commands.has_guild_permissions(manage_guild=True)
@@ -375,7 +430,7 @@ async def config(interaction: discord.Interaction):
 @commands.has_role(STAFF_ROLE)
 async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> None:
     if feature is None:
-        description1 = f">>> - `!ban [user] [duration] [reason]`\n- `!unban [user] [reason]`\n- `!kick [user] [reason]`\
+        description1 = f">>> - `/ban [user] [duration] [reason]`\n- `!unban [user] [reason]`\n- `!kick [user] [reason]`\
                         \n- `!mute [user] [duration] [reason]`\n- `!unmute [user] [reason]`\
                         \n- `!warn [user] [reason]`\n- `!deletewarns [user] [reason]`\n- `!unwarn [case_id] [reason]`\
                         \n- `!slowmode [duration] [channel]`\
