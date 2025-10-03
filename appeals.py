@@ -463,6 +463,8 @@ class DenyButton(discord.ui.Button):
                                     description=f"- `{owner_id}` could not be found. Please close this thread manually and ping <@802167689011134474>.",
                                     color=discord.Color.brand_red())
                 await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_modal(DenyModal(owner))
 
 class CasesButton(discord.ui.Button):
     def __init__(self, owner: discord.Member | discord.User):
@@ -553,3 +555,4 @@ class AcceptDenyView(discord.ui.LayoutView):
     async def interaction_check(self, interaction: discord.Interaction):
         
         return any(role_id in interaction.user._roles for role_id in APPEAL_STAFF)
+
