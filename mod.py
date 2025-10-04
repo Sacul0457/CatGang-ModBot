@@ -557,7 +557,7 @@ class ModCog(commands.Cog):
                 else self.auto_unban.restart()
             )
         else:
-            await save_to_moddb(self.bot, case_id, member.id, 'ban', interaction.user.id, time.time(), log_message.id)
+            await save_to_moddb(self.bot, case_id, user.id, 'ban', interaction.user.id, time.time(), log_message.id)
 
 
     @app_commands.command(name="unban", description="Unban a user from the server")
@@ -571,6 +571,7 @@ class ModCog(commands.Cog):
         user: discord.User,
         reason: str = "No reason provided.",
     ):
+        await interaction.response.defer(ephemeral=True)
         try:
             await interaction.guild.fetch_ban(user)
         except discord.NotFound:
@@ -1267,7 +1268,6 @@ class ModCog(commands.Cog):
                 if member is None:
                     continue
                 members_list.append(member)
-        print(members_list)
         view = MassView(set(members_list), "masskick", interaction.user.id, interaction)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
