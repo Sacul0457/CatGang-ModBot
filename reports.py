@@ -3,13 +3,10 @@ from __future__ import annotations
 import discord
 from discord.ext import commands
 from discord import app_commands
-import datetime
-from typing import TYPE_CHECKING
-import re
+from typing import Optional, TYPE_CHECKING
 from json import loads
 
 from functions import get_field_content, get_user_id_from_avatar
-from discord.utils import MISSING
 from paginator import ButtonPaginator
 if TYPE_CHECKING:
     from main import ModBot
@@ -418,4 +415,3 @@ class DenyModal(discord.ui.Modal):
         await log_channel.send(embed=log_embed)
         await interaction.followup.send("Success!", ephemeral=True)
         await interaction.message.delete()
-
