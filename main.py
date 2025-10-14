@@ -12,6 +12,7 @@ from functions import save_to_appealdb, delete_from_appealdb, execute_sql
 import aiofiles
 from pathlib import Path
 import psutil
+import time
 
 from json import loads, dumps
 BASE_DIR = Path(__file__).parent
@@ -19,7 +20,7 @@ BASE_DIR = Path(__file__).parent
 # Build full path to the file
 CONFIG_PATH = BASE_DIR / "config.json"
 TOKEN = os.getenv("TOKEN")
-STAFF_ROLE = 1336377690168758342
+STAFF_ROLE = 1424837947177570416
 
 cogs = ("mod", "logs", "automod", "utilities", "appeals", "reports")
 
@@ -74,6 +75,7 @@ class ModBot(commands.Bot):
         )
 
     async def setup_hook(self):
+        await self.setup_config()
         self.mod_pool = await asqlite.create_pool("mod.db", size=5)
 
         for cog in cogs:
@@ -90,23 +92,51 @@ class ModBot(commands.Bot):
         await self.mod_pool.close()
         await super().close()
 
-    async def reload_all_configs(self) -> None:
-        for cog in cogs:
-            try:
-                await self.reload_extension(cog)
-            except Exception as e:
-                print(e)
 
     def get_message(self, id: int, /) -> typing.Optional[discord.Message]:
         """Returns a message from the cache if found."""
         return discord.utils.find(lambda m: m.id == id, reversed(self.cached_messages)) if self.cached_messages else None
+    
+    async def setup_config(self):
+        async with aiofiles.open(CONFIG_PATH, 'r') as f:
+            data = await f.read()
+            data = loads(data)
+
+        roles_data = data['roles']
+        channel_guild_data = data['channel_guild']
+        other_data = data['others']
+        self.mod = roles_data['MOD']
+        self.appeal_staff = roles_data['APPEAL_STAFF']
+        self.admin = roles_data['ADMIN']
+        self.sacul = roles_data['SACUL']
+        self.senior = roles_data['SENIOR']
+        self.appeal_staff_leader = roles_data['APPEAL_STAFF_LEADER']
+        self.main_guild_id = channel_guild_data['GUILD_ID']
+        self.mod_log = channel_guild_data['MOD_LOG']
+        self.appeal_server = channel_guild_data['APPEAL_SERVER'] 
+        self.appeal_channel = channel_guild_data['APPEAL_CHANNEL']
+        self.event_logs = channel_guild_data['EVENT_LOGS']
+        self.black_listed_channels = channel_guild_data['BLACK_LISTED_CHANNELS']
+        self.management_categories = channel_guild_data['MANAGEMENT_CATEGORIES']
+        self.management = channel_guild_data['MANAGEMENT']
+        self.private_log = channel_guild_data['PRIVATE_LOG']
+        self.report_channel = channel_guild_data['REPORT_CHANNEL']
+        self.media_category_id = channel_guild_data['MEDIA_CATEGORY_ID']
+        self.sticky_channel = channel_guild_data['STICKY_CHANNEL']
+        self.catboard = channel_guild_data['CATBOARD']
+        self.reply_emoji_id = channel_guild_data['REPLY_EMOJI_ID']
+        self.custom_emoji_id = channel_guild_data['CUSTOM_EMOJI_ID']
+        self.sticky_channels: list[int] = channel_guild_data['STICKY_CHANNELS']
+
+
+        self.numbers = other_data['NUMBERS']
+
 
 bot = ModBot()
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
     if isinstance(error, discord.app_commands.TransformerError):
-        print(error.transformer.type)
         if error.transformer.type == discord.AppCommandOptionType.user:
             embed = discord.Embed(title="Member Not Found",
                                   description=f"- `{error.value}` is not a member.",
@@ -115,6 +145,8 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
             embed = discord.Embed(title="Transformer Error",
                                   description=f"- {error}",
                                   color=discord.Colour.brand_red())
+    elif isinstance(error, app_commands.MissingAnyRole):
+        pass
     else:
         embed = discord.Embed(title="An Error Occurred",
                               description=f"- {error}\n-# The developer has been notified",
@@ -125,8 +157,10 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     else:
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-async def handle_interaction_error(error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction = None) -> None:
-    sacul = bot.get_user(802167689011134474)
+async def handle_interaction_error(error: commands.CommandError|app_commands.AppCommandError, interaction: discord.Interaction | None = None) -> None:
+    error_channel = bot.get_channel(1425795763627098233)
+    if error_channel is None:
+        return
     content = f"Error: `{error}`"
 
     if interaction:
@@ -134,7 +168,7 @@ async def handle_interaction_error(error: commands.CommandError|app_commands.App
         now = time.time()
         interaction_data = interaction.data or {}
         content += f"\n### Interaction Error:\n>>> Interaction created at <t:{round(interaction_created_at)}:T> ({now - interaction_created_at:.3f}s ago)\
-            \nUser: {interaction.user.mention} | Channel: {interaction.channel.mention} | Type: {interaction.type.name}"
+            \nUser: {interaction.user.mention} | Channel: {getattr(interaction.channel, 'mention', f"Unknown channel ({interaction.channel_id})")} | Type: {interaction.type.name}"
         if interaction.command and interaction.type is discord.InteractionType.application_command and interaction_data:
             command_id = interaction_data.get('id', 0)
             if interaction.command.parent:
@@ -153,9 +187,9 @@ async def handle_interaction_error(error: commands.CommandError|app_commands.App
             content += f"\n```{options_formatted}```"
         else:
             content += f"\n```json\n{interaction_data}```"
-        await sacul.send(content)
+        await error_channel.send(content)
     else:
-        await sacul.send(content=content)
+        await error_channel.send(content=content)
 
 
 @bot.command()
@@ -168,6 +202,7 @@ async def sync(ctx: commands.Context) -> None:
 
 
 @bot.command()
+@commands.guild_only()
 @commands.has_guild_permissions(manage_guild=True)
 async def stats(ctx: commands.Context) -> None:
     cpu_count = psutil.cpu_count()
@@ -284,28 +319,41 @@ async def evalsql(interaction: discord.Interaction, query: str):
 class RoleModals(discord.ui.Modal):
     def __init__(self) -> None:
         super().__init__(title="Edit Roles", timeout=None, custom_id="edit_roles_modal")
+
+        moderator_roles = ", ".join(f"<@&{role_id}>" for role_id in bot.mod)
+        senior_moderator_roles = ", ".join(f"<@&{role_id}>" for role_id in bot.senior)
+        admin_roles = ", ".join(f"<@&{role_id}>" for role_id in bot.admin)
+        appeal_staff_roles = ", ".join(f"<@&{role_id}>" for role_id in bot.appeal_staff)
+        all_roles = discord.ui.TextDisplay(f"### Current Configuration:\n>>> Moderator Roles: {moderator_roles}\
+                                           \nSnr Moderator Roles: {senior_moderator_roles}\
+                            \nAdmin Roles: {admin_roles}\nAppeal Staff Roles: {appeal_staff_roles}")
+
         self.role_type = discord.ui.Label(text="Role Type", description="What should this role be (e.g staff role, senior mod role etc)",
-                                          component=discord.ui.Select(options=[discord.SelectOption(label="Moderator", value="MODERATOR"),
-                                                                               discord.SelectOption(label="Senior Moderator", value="SENIOR"),
-                                                                               discord.SelectOption(label="Admin", value="ADMIN"),
+                                          component=discord.ui.Select(options=[discord.SelectOption(label="Moderator", value="mod"),
+                                                                               discord.SelectOption(label="Senior Moderator", value="senior"),
+                                                                               discord.SelectOption(label="Admin", value="admin"),
                                                                                ], required=True))
         self.roles = discord.ui.Label(text="New Role", description="What this role should be in the config",
                                       component=discord.ui.RoleSelect(max_values=5, min_values=1))
         
+        self.add_item(all_roles)
         self.add_item(self.role_type)
         self.add_item(self.roles)
     
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
-        role_type: str = self.role_type.component.values[0] #type: ignore
+        assert(isinstance(self.role_type.component, discord.ui.Select))
+        assert(isinstance(self.roles.component, discord.ui.RoleSelect))
+
+        role_type = self.role_type.component.values[0]
 
         async with aiofiles.open(CONFIG_PATH, "r") as f:
             text = await f.read()
             data = loads(text)
 
         
-        chosen_roles = [int(value) for value in self.roles.component.values]
-        data['roles'][f"{role_type}"] = chosen_roles
+        chosen_roles = [role.id for role in self.roles.component.values]
+        data['roles'][f"{role_type.upper()}"] = chosen_roles
 
         async with aiofiles.open(CONFIG_PATH, "w") as f:
             to_write = dumps(data, indent=3)
@@ -314,37 +362,52 @@ class RoleModals(discord.ui.Modal):
 
         role_mentions = ",".join([f"<@&{role_id}>" for role_id in chosen_roles])
         embed = discord.Embed(title="Role Config Updated",
-                              description=f"- {role_mentions} is now the `{role_type}` role.",
+                              description=f"- {role_mentions} is now the `{role_type.upper()}` role.",
                               color=discord.Color.brand_green())
         await interaction.followup.send(embed=embed, ephemeral=True)
-        await bot.reload_all_configs()
+        setattr(bot, role_type, chosen_roles)
 
 
 class ChannelModals(discord.ui.Modal):
     def __init__(self) -> None:
         super().__init__(title="Edit Channels", timeout=None, custom_id="edit_channel_modal")
+
+        mod_log = (f"<#{bot.mod_log}>")
+        event_logs = (f"<#{bot.event_logs}>")
+        management_logs = (f"<#{bot.management}>")
+        appeal_channel = (f"<#{bot.appeal_channel}>")
+        private_log = (f"<#{bot.private_log}>")
+        all_channels = discord.ui.TextDisplay(f"### Current Config:\n>>> Mod Log: {mod_log}\nEvent Log: {event_logs}\
+                                              \nManagement Log: {management_logs}\nAppeal Channel: {appeal_channel}\
+                                              \nPrivate Log: {private_log}")
+
         self.channel_type = discord.ui.Label(text="Channel Type", description="What should this channel be (e.g logs, mod logs etc)",
-                                          component=discord.ui.Select(options=[discord.SelectOption(label="Mod Logs", value="MOD_LOG"),
-                                                                               discord.SelectOption(label="Appeal Channel", value="APPEAL_CHANNEL"),
-                                                                               discord.SelectOption(label="Event Logs", value="EVENTS_LOGS"),
-                                                                               discord.SelectOption(label="Management Logs", value="MANAGEMENT"),
+                                          component=discord.ui.Select(options=[discord.SelectOption(label="Mod Logs", value="mod_log"),
+                                                                               discord.SelectOption(label="Appeal Channel", value="appeal_channel"),
+                                                                               discord.SelectOption(label="Event Logs", value="event_logs"),
+                                                                               discord.SelectOption(label="Management Logs", value="management"),
+                                                                               discord.SelectOption(label="Private Log", value="private_log")
                                                                                ], required=True))
         self.channels = discord.ui.Label(text="New Channel", description="What this channel should be in the config",
                                       component=discord.ui.ChannelSelect(max_values=1, min_values=1, channel_types=[discord.ChannelType.text]))
         
+        self.add_item(all_channels)
         self.add_item(self.channel_type)
         self.add_item(self.channels)
     
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
-        channel_type: str = self.channel_type.component.values[0] #type: ignore
+        assert(isinstance(self.channel_type.component, discord.ui.Select))
+        assert(isinstance(self.channels.component, discord.ui.ChannelSelect))
+        channel_type = self.channel_type.component.values[0]
+
 
         async with aiofiles.open(CONFIG_PATH, "r") as f:
             text = await f.read()
             data = loads(text)
 
-        chosen_channel: int = int(self.channels.component.values[0])
-        data['channel_guild'][channel_type] = chosen_channel
+        chosen_channel = self.channels.component.values[0].id
+        data['channel_guild'][channel_type.upper()] = chosen_channel
 
         async with aiofiles.open(CONFIG_PATH, "w") as f:
             to_write = dumps(data, indent=3)
@@ -354,7 +417,8 @@ class ChannelModals(discord.ui.Modal):
                               description=f"- <#{chosen_channel}> is now the `{channel_type}` channel.",
                               color=discord.Color.brand_green())
         await interaction.followup.send(embed=embed, ephemeral=True)
-        await bot.reload_all_configs()
+        setattr(bot, channel_type, chosen_channel)
+
 
 class ConfigContainer(discord.ui.Container):
     def __init__(self, children: list[discord.ui.Item]) -> None:
@@ -380,22 +444,16 @@ class ShowConfigButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True)
-        async with aiofiles.open(CONFIG_PATH, "r") as f:
-            text = await f.read()
-            data = loads(text)
-        roles_data = data['roles']
-        channels_data = data['channel_guild']
 
+        moderator_roles = ", ".join(f"<@&{role_id}>" for role_id in bot.mod)
+        senior_moderator_roles = ", ".join(f"<@&{role_id}>" for role_id in bot.senior)
+        admin_roles = ", ".join(f"<@&{role_id}>" for role_id in bot.admin)
+        appeal_staff_roles = ", ".join(f"<@&{role_id}>" for role_id in bot.appeal_staff)
 
-        moderator_roles = ", ".join(f"<@&{role_id}>" for role_id in roles_data['MODERATOR'])
-        senior_moderator_roles = ", ".join(f"<@&{role_id}>" for role_id in roles_data['SENIOR'])
-        admin_roles = ", ".join(f"<@&{role_id}>" for role_id in roles_data['ADMIN'])
-        appeal_staff_roles = ", ".join(f"<@&{role_id}>" for role_id in roles_data['APPEAL_STAFF'])
-
-        mod_log = (f"<#{channels_data['MOD_LOG']}>")
-        event_logs = (f"<#{channels_data['EVENTS_LOGS']}>")
-        management_logs = (f"<#{channels_data['MANAGEMENT']}>")
-        appeal_channel = (f"<#{channels_data['APPEAL_CHANNEL']}>")
+        mod_log = (f"<#{bot.mod_log}>")
+        event_logs = (f"<#{bot.event_logs}>")
+        management_logs = (f"<#{bot.management}>")
+        appeal_channel = (f"<#{bot.appeal_channel}>")
 
         embed = discord.Embed(title="Configs")
         embed.add_field(name="Roles",
@@ -421,12 +479,14 @@ class ConfigView(discord.ui.LayoutView):
             self.add_item(ConfigContainer([header, separator1, edit_role_accessory, edit_channel_accessory, separator2, show_config_accessory]))
 
 @bot.tree.command(description="Configure roles and channels")
+@app_commands.guild_only()
 @app_commands.default_permissions(manage_guild=True)
 async def config(interaction: discord.Interaction):
     await interaction.response.send_message(view=ConfigView("basic_config"), ephemeral=True)
 
 
 @bot.command()
+@commands.guild_only()
 @commands.has_role(STAFF_ROLE)
 async def help(ctx: commands.Context, feature: typing.Optional[str] = None) -> None:
     if feature is None:
