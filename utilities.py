@@ -1,42 +1,19 @@
+from __future__ import annotations
+
 import discord
 from discord.ext import commands, tasks
 import asyncio
 import datetime
 import time
 from discord import app_commands
-from typing import Literal
-from json import loads
-from pathlib import Path
+from typing import Literal, TYPE_CHECKING
+if TYPE_CHECKING:
+    from main import ModBot
 
-BASE_DIR = Path(__file__).parent
 
-# Build full path to the file
-CONFIG_PATH = BASE_DIR / "config.json"
-
-def load_config():
-    with open(CONFIG_PATH, 'r') as f:
-        data = f.read()
-        return loads(data)
-    
-data = load_config()
-roles_data = data['roles']
-channel_guild_data = data['channel_guild']
-MODERATOR = roles_data['MODERATOR']
-ADMIN = roles_data['ADMIN']
-SACUL = roles_data['SACUL']
-SENIOR = roles_data['SENIOR']
-
-GUILD_ID = channel_guild_data['GUILD_ID']
-MOD_LOG = channel_guild_data['MOD_LOG']
-MEDIA_CATEGORY_ID = channel_guild_data['MEDIA_CATEGORY_ID']
-STICKY_CHANNEL = channel_guild_data['STICKY_CHANNEL']
-CATBOARD = channel_guild_data['CATBOARD']
-REPLY_EMOJI_ID = channel_guild_data['REPLY_EMOJI_ID']
-CUSTOM_EMOJI_ID = channel_guild_data['CUSTOM_EMOJI_ID']
-STICKY_CHANNELS = channel_guild_data['STICKY_CHANNELS']
 
 class Utilities(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: ModBot):
         self.bot = bot
         self.embed = discord.Embed(
             title="❕Advertising Rules",
@@ -54,9 +31,24 @@ class Utilities(commands.Cog):
         self.last_sent_data : dict[int, discord.Message] = {}
         self.already_added = []
 
+    @staticmethod
+    def has_roles(admin: bool = False, mod: bool = False, snr: bool = False, appeal_staff: bool = False):
+        async def predicate(ctx: commands.Context[ModBot]) -> bool:
+            roles = [1294291057437048843]
+            if admin:
+                roles.extend(ctx.bot.admin)
+            if mod:
+                roles.extend(ctx.bot.mod)
+            if snr:
+                roles.extend(ctx.bot.senior)
+            if appeal_staff:
+                roles.extend(ctx.bot.appeal_staff)
+            return any(role_id in ctx.author._roles for role_id in roles)
+        return commands.check(predicate)
+
     async def cog_load(self):
-        for channel_id in STICKY_CHANNELS:
-            channel : discord.TextChannel = await self.bot.fetch_channel(channel_id)
+        for channel_id in self.bot.sticky_channels:
+            channel: discord.TextChannel = await self.bot.fetch_channel(channel_id)
             try:
                 last_message_id = channel.last_message_id or 0
                 last_message = await channel.fetch_message(last_message_id)
@@ -65,34 +57,35 @@ class Utilities(commands.Cog):
                     continue
             except discord.NotFound:
                 pass
-            if channel.id == STICKY_CHANNEL:
+            if channel.id == self.bot.sticky_channel:
                 last_sent_message = await channel.send(embed=self.embed)
             else:
                 last_sent_message = await channel.send(self.only_media)
             self.last_sent_data[channel_id] = last_sent_message
             await asyncio.sleep(0.25)
 
+
     @commands.Cog.listener("on_message")
     async def sticky_message_listener(self, message: discord.Message):
         if message.author.bot:
             return
-        if message.channel.id == STICKY_CHANNEL:
+        if message.channel.id == self.bot.sticky_channel:
             last_send_message: discord.Message | None = self.last_sent_data.get(message.channel.id)
             if last_send_message:
                 if message.id != last_send_message.id:
                     try:
                         await last_send_message.delete()
-                    except discord.NotFound as e:
+                    except discord.NotFound:
                         return
                     new_last_sent = await message.channel.send(embed=self.embed)
                     self.last_sent_data[message.channel.id] = new_last_sent
-        elif message.channel.id in STICKY_CHANNELS and message.channel.id != STICKY_CHANNEL:
+        elif message.channel.id in self.bot.sticky_channels and message.channel.id != self.bot.sticky_channel:
             last_send_message : discord.Message | None = self.last_sent_data.get(message.channel.id)
             if last_send_message:
                 if message.id != last_send_message.id:
                     try:
                         await last_send_message.delete()
-                    except discord.NotFound as e:
+                    except discord.NotFound:
                         return
                     new_last_sent = await message.channel.send(self.only_media)
                     self.last_sent_data[message.channel.id] = new_last_sent 
@@ -104,11 +97,11 @@ class Utilities(commands.Cog):
     ) -> None:
         if reaction.is_custom_emoji() and isinstance(reaction.emoji, discord.Emoji):
             if (
-                reaction.emoji.id == CUSTOM_EMOJI_ID
+                reaction.emoji.id == self.bot.custom_emoji_id
                 and reaction.message.id not in self.already_added
                 and reaction.count == 3
             ):
-                channel = reaction.message.guild.get_channel(CATBOARD)
+                channel = reaction.message.guild.get_channel(self.bot.catboard)
                 if reaction.message.reference and not reaction.message.flags.forwarded:
                     replied_message = (
                         reaction.message.reference.cached_message
@@ -121,7 +114,7 @@ class Utilities(commands.Cog):
                     )
                     embed = discord.Embed(
                         title="",
-                        description=f"-# <:reply:{REPLY_EMOJI_ID}> [@{replied_message.author}](https://discord.com/users/{replied_message.author.id}): `{replied_content}`\
+                        description=f"-# <:reply:{self.bot.reply_emoji_id}> [@{replied_message.author}](https://discord.com/users/{replied_message.author.id}): `{replied_content}`\
                                         \n**[@{reaction.message.author}](https://discord.com/users/{reaction.message.author.id})**: {reaction.message.content}",
                         timestamp=discord.utils.utcnow(),
                         color=reaction.message.author.top_role.color,
@@ -152,7 +145,7 @@ class Utilities(commands.Cog):
 
     @commands.command(name="dm", description="DM a user")
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, SACUL)
+    @has_roles(admin=True)
     async def dm(
         self, ctx: commands.Context, member: discord.Member, *, message: str) -> None:
         if message is None:
@@ -202,7 +195,7 @@ class Utilities(commands.Cog):
 
     @commands.command(name="say", description="Send a message in a channel")
     @commands.guild_only()
-    @commands.has_any_role(*ADMIN, SACUL)
+    @has_roles(appeal_staff=True)
     async def say(
         self, ctx: commands.Context, channel: discord.TextChannel | str, *, message: str = None) -> None:
         if message is None and channel and isinstance(channel, discord.TextChannel) or channel is None:
@@ -302,4 +295,3 @@ class SayDmView(discord.ui.LayoutView):
             self.add_item(DMContainer(messageable, message, attachments))
         else:
             self.add_item(SayContainer(messageable, message, attachments)) 
-
