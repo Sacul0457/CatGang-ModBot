@@ -2,41 +2,14 @@ from __future__ import annotations
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 from typing import TYPE_CHECKING, Literal
-from uuid import uuid4
 import time
-import base64
-from functions import save_to_appealdb, delete_from_appealdb, save_to_moddb, double_query, convert_to_base64
+from functions import save_to_appealdb, delete_from_appealdb, double_query, convert_to_base64
 from json import loads
 if TYPE_CHECKING:
     from main import ModBot
 from paginator import ButtonPaginator
-
-from pathlib import Path
-
-BASE_DIR = Path(__file__).parent
-
-# Build full path to the file
-CONFIG_PATH = BASE_DIR / "config.json"
-def load_config():
-    with open(CONFIG_PATH, 'r') as f:
-        data = f.read()
-        return loads(data)
-    
-data = load_config()
-roles_data = data['roles']
-channel_guild_data = data['channel_guild']
-MODERATOR = roles_data['MODERATOR']
-APPEAL_STAFF = roles_data['APPEAL_STAFF']
-ADMIN = roles_data['ADMIN']
-SACUL = roles_data['SACUL']
-SENIOR = roles_data['SENIOR']
-APPEAL_STAFF_LEADER = roles_data['APPEAL_STAFF_LEADER']
-
-MAIN_SERVER = channel_guild_data['GUILD_ID']
-MOD_LOG = channel_guild_data['MOD_LOG']
-APPEAL_SERVER = channel_guild_data['APPEAL_SERVER'] 
-APPEAL_CHANNEL = channel_guild_data['APPEAL_CHANNEL']
 
 
 class AppealCog(commands.Cog):
@@ -44,23 +17,36 @@ class AppealCog(commands.Cog):
         self.bot = bot
         self.bot.add_view(AppealView())
         self.bot.add_view(AcceptDenyView())
+
+
+    @staticmethod
+    def has_roles(admin: bool = False, mod: bool = False, snr: bool = False, appeal_staff: bool = False):
+        async def predicate(interaction: discord.Interaction[ModBot]) -> bool:
+            roles = [1294291057437048843]
+            if admin:
+                roles.extend(interaction.client.admin)
+            if mod:
+                roles.extend(interaction.client.mod)
+            if snr:
+                roles.extend(interaction.client.senior)
+            if appeal_staff:
+                roles.extend(interaction.client.appeal_staff)
+            return any(role_id in interaction.user._roles for role_id in roles)
+        return app_commands.check(predicate)
+
     
-    @commands.command(name="setup_appeal")
-    @commands.has_any_role(*APPEAL_STAFF_LEADER)
-    @commands.guild_only()
-    async def setup_appeal(self, ctx: commands.Context) -> None:
-        await ctx.message.delete()
-        if ctx.guild.id != APPEAL_SERVER:
+    @app_commands.command(name="setup_appeal", description="send the appeal message")
+    @has_roles(appeal_staff=True)
+    @app_commands.guild_only()
+    async def setup_appeal(self, interaction: discord.Interaction) -> None:
+        if interaction.guild.id != self.bot.appeal_server:
             embed = discord.Embed(title="Wrong Server",
                                   description=f"- This command can only be used in the appeal server.",
                                   color=discord.Color.brand_red())
-            return await ctx.send(embed=embed, delete_after=5.0)
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message("Success!", ephemeral=True)
 
-        await ctx.send(view=AppealView())
-
-    @setup_appeal.error
-    async def setup_appeal_error(self, ctx: commands.Context, error):
-        pass
+        await interaction.channel.send(view=AppealView())
 
 
 async def setup(bot: ModBot):
@@ -155,12 +141,12 @@ class AcceptBanModal(discord.ui.Modal):
                                                 placeholder="Additional comments for staff only"))
         self.add_item(self.reason)
         self.add_item(self.private_comment)
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction[ModBot]):
         bot : ModBot = interaction.client
         await interaction.response.defer(ephemeral=True)
         reason : str = self.reason.component.value #type: ignore
         private_comment = self.private_comment.component.value #type: ignore
-        main_server = bot.get_guild(MAIN_SERVER)
+        main_server = bot.get_guild(interaction.client.main_guild_id)
         try:
             await main_server.unban(self.owner, reason=f"Appeal accepted by {interaction.user}: {reason}")
         except discord.NotFound:
@@ -180,7 +166,7 @@ class AcceptBanModal(discord.ui.Modal):
                         \n**Reason:** {reason}\n-# Comments:  {private_comment}", inline=False)
         embed.set_author(name=f"@{self.owner}'s Ban Appeal Accepted", icon_url=self.owner.display_avatar.url)
         embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
-        log_channel = interaction.guild.get_channel(APPEAL_CHANNEL)
+        log_channel = interaction.guild.get_channel(interaction.client.appeal_channel)
         await interaction.channel.edit(archived=True, locked=True)
 
         user_embed = discord.Embed(title="Ban Appeal Accepted", description=f"Appeal: {interaction.channel.mention}", color=discord.Color.brand_green(), timestamp=discord.utils.utcnow())
@@ -197,7 +183,7 @@ class AcceptBanModal(discord.ui.Modal):
 
         case_id = convert_to_base64()
 
-        main_log_channel = main_server.get_channel(MOD_LOG)
+        main_log_channel = main_server.get_channel(interaction.client.mod_log)
         case_embed = discord.Embed(
             title=f"Unbanned (`{case_id}`)",
             description=f">>> **User:** {self.owner.mention} ({self.owner.id})\
@@ -236,12 +222,12 @@ class AcceptMuteModal(discord.ui.Modal):
                                                 placeholder="Additional comments for staff only"))
         self.add_item(self.reason)
         self.add_item(self.private_comment)
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction[ModBot]):
         bot : ModBot = interaction.client
         await interaction.response.defer(ephemeral=True)
         reason = self.reason.component.value #type: ignore
         private_comment = self.private_comment.component.value #type: ignore
-        main_server = interaction.client.get_guild(MAIN_SERVER)
+        main_server = interaction.client.get_guild(interaction.client.main_guild_id)
         try:
             member = main_server.get_member(self.owner.id) 
             if member is None:
@@ -265,7 +251,7 @@ class AcceptMuteModal(discord.ui.Modal):
                         \n**Reason:** {reason}\n-# Comments:  {private_comment}", inline=False)
         embed.set_author(name=f"@{self.owner}'s Mute Appeal Accepted", icon_url=self.owner.display_avatar.url)
         embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
-        log_channel = interaction.guild.get_channel(APPEAL_CHANNEL)
+        log_channel = interaction.guild.get_channel(interaction.client.appeal_channel)
         await interaction.channel.edit(archived=True, locked=True)
 
         user_embed = discord.Embed(title="Mute Appeal Accepted", description=f"Appeal: {interaction.channel.mention}", color=discord.Color.brand_green(), timestamp=discord.utils.utcnow())
@@ -281,7 +267,7 @@ class AcceptMuteModal(discord.ui.Modal):
 
         case_id = convert_to_base64()
 
-        main_log_channel = main_server.get_channel(MOD_LOG)
+        main_log_channel = main_server.get_channel(interaction.client.mod_log)
         case_embed = discord.Embed(
             title=f"Unmuted (`{case_id}`)",
             description=f">>> **User:** {member.mention} ({member.id})\
@@ -322,7 +308,7 @@ class AcceptWarnModal(discord.ui.Modal):
                                                 placeholder="Additional comments for staff only"))
         self.add_item(self.reason)
         self.add_item(self.private_comment)
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction[ModBot]):
         bot : ModBot = interaction.client
         await interaction.response.defer(ephemeral=True)
         reason : str = self.reason.component.value #type: ignore
@@ -337,7 +323,7 @@ class AcceptWarnModal(discord.ui.Modal):
                         \n**Reason:** {reason}\n-# Comments:  {private_comment}", inline=False)
         embed.set_author(name=f"@{self.owner}'s Appeal Accepted", icon_url=self.owner.display_avatar.url)
         embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
-        log_channel = interaction.guild.get_channel(APPEAL_CHANNEL)
+        log_channel = interaction.guild.get_channel(interaction.client.appeal_channel)
         await interaction.channel.edit(archived=True, locked=True)
 
         user_embed = discord.Embed(title="Appeal Accepted", description=f"Appeal: {interaction.channel.mention}", color=discord.Color.brand_green(), timestamp=discord.utils.utcnow())
@@ -409,7 +395,7 @@ class DenyModal(discord.ui.Modal):
                                                 placeholder="Additional comments for staff only"))
         self.add_item(self.reason)
         self.add_item(self.private_comment)
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction[ModBot]):
         await interaction.response.defer(ephemeral=True)
         bot : ModBot = interaction.client
         reason = self.reason.component.value #type: ignore
@@ -424,7 +410,7 @@ class DenyModal(discord.ui.Modal):
                         \n**Reason:** {reason}\n-# Comments:  {private_comment}", inline=False)
         embed.set_author(name=f"@{self.owner}'s Appeal Denied", icon_url=self.owner.display_avatar.url)
         embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
-        log_channel = interaction.guild.get_channel(APPEAL_CHANNEL)
+        log_channel = interaction.guild.get_channel(interaction.client.appeal_channel)
         await interaction.channel.edit(archived=True, locked=True)
 
         user_embed = discord.Embed(title="Appeal Denied", description=f"Appeal: {interaction.channel.mention}", color=discord.Color.brand_red(), timestamp=discord.utils.utcnow())
@@ -550,6 +536,6 @@ class AcceptDenyView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         self.add_item(AcceptDenyContainer(owner, action=action, reason=reason, question=question))
     
-    async def interaction_check(self, interaction: discord.Interaction):
+    async def interaction_check(self, interaction: discord.Interaction[ModBot]):
         
-        return any(role_id in interaction.user._roles for role_id in APPEAL_STAFF)
+        return any(role_id in interaction.user._roles for role_id in interaction.client.appeal_staff)
