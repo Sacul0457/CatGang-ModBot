@@ -8,50 +8,40 @@ import datetime
 import time
 from paginator import ButtonPaginator
 from functions import save_to_moddb, double_query, convert_to_base64
-from json import loads
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from main import ModBot
 
-from pathlib import Path
-
-BASE_DIR = Path(__file__).parent
-
-
-CONFIG_PATH = BASE_DIR / "config.json"
-def load_config():
-    with open(CONFIG_PATH, 'r') as f:
-        data = f.read()
-        return loads(data)
-    
-data = load_config()
-roles_data = data['roles']
-channel_guild_data = data['channel_guild']
-other_data = data['others']
-
-MODERATOR = roles_data['MODERATOR']
-APPEAL_STAFF = roles_data['APPEAL_STAFF']
-ADMIN = roles_data['ADMIN']
-SACUL = roles_data['SACUL']
-SENIOR = roles_data['SENIOR']
-
-GUILD_ID = channel_guild_data['GUILD_ID']
-MOD_LOG = channel_guild_data['MOD_LOG']
-
-NUMBERS = other_data['NUMBERS']
-
 
 class ModCog(commands.Cog):
     def __init__(self, bot: ModBot):
         self.bot = bot
+    
+    clean_command = app_commands.Group(name="clean", description="Purge messages")
+
+
+    @staticmethod
+    def has_roles(admin: bool = False, mod: bool = False, snr: bool = False, appeal_staff: bool = False):
+        async def predicate(interaction: discord.Interaction[ModBot]) -> bool:
+            roles = [1294291057437048843]
+            if admin:
+                roles.extend(interaction.client.admin)
+            if mod:
+                roles.extend(interaction.client.mod)
+            if snr:
+                roles.extend(interaction.client.senior)
+            if appeal_staff:
+                roles.extend(interaction.client.appeal_staff)
+            return any(role_id in interaction.user._roles for role_id in roles)
+        return app_commands.check(predicate)
 
     async def cog_load(self):
         self.auto_unban.start()
 
     @app_commands.command(name="resetnickname", description="Reset the nickname of a user")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, *MODERATOR, SACUL)
+    @has_roles(admin=True, snr=True, mod=True)
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(user = "The member to reset")
     async def resetnickname(self, interaction: discord.Interaction, user: discord.Member):
@@ -86,7 +76,7 @@ class ModCog(commands.Cog):
             color=discord.Color.brand_green(),
         )
         await interaction.followup.send(embed=channel_embed, ephemeral=True)
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         embed = discord.Embed(
             title="Nickname Reset",
             description=f">>> **User:** {user.mention} ({user.id})\n**Before reset:** `{nickname}`",
@@ -106,7 +96,7 @@ class ModCog(commands.Cog):
     @app_commands.describe(user = "The user to warn", reason = "The reason for warning", image_proof1="The image proof",
                            image_proof2="The image proof", image_proof3="The image proof")
     @app_commands.default_permissions(manage_messages=True)
-    @app_commands.checks.has_any_role(*ADMIN, *MODERATOR, SACUL, *SENIOR)
+    @has_roles(admin=True, mod=True)
     async def warn(
         self,
         interaction: discord.Interaction,
@@ -130,7 +120,6 @@ class ModCog(commands.Cog):
             files.append(await image_proof2.to_file())
         if image_proof3 is not None:
             files.append(await image_proof3.to_file())
-        print(files)
         
 
         case_id = convert_to_base64()
@@ -152,7 +141,7 @@ class ModCog(commands.Cog):
             color=discord.Color.brand_green(),
         )
         await interaction.followup.send(embed=channel_embed)
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         embed = discord.Embed(
             title=f"Warned (`{case_id}`)",
             description=f">>> **User:** {user.mention} ({user.id})\
@@ -175,7 +164,7 @@ class ModCog(commands.Cog):
     @app_commands.guild_only()
     @app_commands.describe(case_id="The case ID of the case", reason = "The reason for unwarning")
     @app_commands.default_permissions(manage_messages=True)
-    @app_commands.checks.has_any_role(*ADMIN, SACUL)
+    @has_roles(admin=True)
     async def unwarn(
         self,
         interaction: discord.Interaction,
@@ -227,7 +216,7 @@ class ModCog(commands.Cog):
             color=discord.Color.brand_green(),
         )
         await interaction.followup.send(embed=channel_embed)
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         embed = discord.Embed(
             title=f"Unwarned (`{new_case_id}`)",
             description=f">>> **User:** {member.mention} ({member.id})\
@@ -247,7 +236,7 @@ class ModCog(commands.Cog):
         embed.set_author(name=f"@{member}", icon_url=member.display_avatar.url)
         embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
         embed.set_thumbnail(url=member.display_avatar.url)
-        log_message = await channel.send(embed=embed, view=JumpToCase(result['log_id']))
+        log_message = await channel.send(embed=embed, view=JumpToCase(result['log_id'], self.bot.main_guild_id, self.bot.mod_log))
         await save_to_moddb(self.bot, new_case_id, result["user_id"], "unwarn", interaction.user.id, time.time(), log_message.id)
 
 
@@ -255,7 +244,7 @@ class ModCog(commands.Cog):
     @app_commands.guild_only()
     @app_commands.describe(user = "The user to delete warns from", reason = "The reason for deleting all warns")
     @app_commands.default_permissions(manage_messages=True)
-    @app_commands.checks.has_any_role(*ADMIN, *MODERATOR, SACUL, *SENIOR)
+    @has_roles(admin=True)
     async def deletewarns(
         self,
         interaction: discord.Interaction,
@@ -311,7 +300,7 @@ class ModCog(commands.Cog):
             color=discord.Color.brand_green(),
         )
         await interaction.followup.send(embed=channel_embed)
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         embed = discord.Embed(
             title=f"Warns Deleted (`{case_id}`)",
             description=f">>> **User:** {user.mention} ({user.id})\
@@ -356,20 +345,20 @@ class ModCog(commands.Cog):
 
         mod = self.bot.get_user(case_data["mod_id"]) or discord.Object(case_data['mod_id'], type=discord.User)
 
-        guild = self.bot.get_guild(GUILD_ID)
+        guild = self.bot.get_guild(self.bot.main_guild_id)
         try:
             await guild.unban(user, reason=f"Tempban Expired")
         except discord.Forbidden:
             return
         banned_on = case_data["time"]
-        channel = self.bot.get_channel(MOD_LOG)
+        channel = self.bot.get_channel(self.bot.mod_log)
         log_id = result["log_id"]
         old_case_id = result['case_id']
         case_id = convert_to_base64()
         embed = discord.Embed(
             title=f"Unbanned | Tempban Expired (`{case_id}`)",
-            description=f">>> **User:** {user.mention if isinstance(user, discord.User) else f"<@{user.id}>"} ({user.id})\n**Case Id:** `{old_case_id}`\
-                                \n**Mod:** {mod.mention if isinstance(mod, discord.User) else f"<@{mod.id}>"} ({mod.id})\n**Banned on:** <t:{int(banned_on)}:f>",
+            description=f">>> **User:** <@{user.id}> ({user.id})\n**Case Id:** `{old_case_id}`\
+                                \n**Mod:** <@{mod.id}> ({mod.id})\n**Banned on:** <t:{int(banned_on)}:f>",
             color=discord.Color.brand_green(),
             timestamp=discord.utils.utcnow(),
         )
@@ -378,7 +367,7 @@ class ModCog(commands.Cog):
             embed.set_thumbnail(url=user.display_avatar.url)
         if isinstance(mod, discord.User):
             embed.set_footer(text=f"@{mod}", icon_url=mod.display_avatar.url)
-        log_message = await channel.send(embed=embed, view=PreviousCase(log_id))
+        log_message = await channel.send(embed=embed, view=PreviousCase(log_id, self.bot.main_guild_id, self.bot.mod_log))
         await double_query(self.bot, query_one='''DELETE FROM tempbandb WHERE user_id = ?''', 
                             value_one=(user_id, ),
 
@@ -388,7 +377,7 @@ class ModCog(commands.Cog):
 
     @app_commands.command(name="ban", description="Ban a user from the server")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, SACUL, *MODERATOR)
+    @has_roles(admin=True, snr=True, mod=True)
     @app_commands.describe(user = "The user to ban", duration="The duration of the ban, else Permanent", 
                            reason = "The reason for banning", image_proof1="The image proof",
                            image_proof2="The image proof", image_proof3="The image proof")
@@ -410,7 +399,7 @@ class ModCog(commands.Cog):
         total_seconds = None
         if duration is not None:
             if duration.endswith(("s", "m", "h", "d")) and any(
-                num in duration for num in NUMBERS
+                num in duration for num in self.bot.numbers
             ):
                 duration_list = [duration for duration in duration.split(",")]
                 for duration in duration_list:
@@ -480,9 +469,9 @@ class ModCog(commands.Cog):
                 pass
 
         files = [await image_proof1.to_file()] if image_proof1 is not None else []
-        if image_proof2 is not None :
+        if image_proof2 is not None:
             files.append(await image_proof2.to_file())
-        if image_proof3 is not None :
+        if image_proof3 is not None:
             files.append(await image_proof3.to_file())
 
         if isinstance(user, discord.Member) and not user.bot:
@@ -525,7 +514,7 @@ class ModCog(commands.Cog):
         )
         await interaction.followup.send(embed=channel_embed)
 
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         case_id = convert_to_base64()
 
         embed = discord.Embed(
@@ -557,20 +546,21 @@ class ModCog(commands.Cog):
                 else self.auto_unban.restart()
             )
         else:
-            await save_to_moddb(self.bot, case_id, member.id, 'ban', interaction.user.id, time.time(), log_message.id)
+            await save_to_moddb(self.bot, case_id, user.id, 'ban', interaction.user.id, time.time(), log_message.id)
 
 
     @app_commands.command(name="unban", description="Unban a user from the server")
     @app_commands.guild_only()
     @app_commands.describe(user = "The user to unban", reason = "The reason for unbanning")
     @app_commands.default_permissions(manage_messages=True)
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, SACUL)
+    @has_roles(admin=True, snr=True)
     async def unban(
         self,
         interaction: discord.Interaction,
         user: discord.User,
         reason: str = "No reason provided.",
     ):
+        await interaction.response.defer(ephemeral=True)
         try:
             await interaction.guild.fetch_ban(user)
         except discord.NotFound:
@@ -598,7 +588,7 @@ class ModCog(commands.Cog):
         )
         await interaction.followup.send(embed=channel_embed)
         case_id = convert_to_base64()
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         embed = discord.Embed(
             title=f"Unbanned (`{case_id}`)",
             description=f">>> **User:** {user.mention} ({user.id})\
@@ -633,7 +623,7 @@ class ModCog(commands.Cog):
 
     @app_commands.command(name="kick", description="Kick a user from the server")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, SACUL, *SENIOR, *MODERATOR)
+    @has_roles(admin=True, mod=True)
     @app_commands.describe(user = "The user to kick", reason = "The reason for kicking",
                             image_proof1="The image proof",
                             image_proof2="The image proof",
@@ -697,7 +687,7 @@ class ModCog(commands.Cog):
         )
         await interaction.followup.send(embed=channel_embed)
 
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         embed = discord.Embed(
             title=f"Kicked (`{case_id}`)",
             description=f">>> **User:** {user.mention} ({user.id})\
@@ -718,7 +708,7 @@ class ModCog(commands.Cog):
 
     @app_commands.command(name="mute", description="Mute a user from the server")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, *MODERATOR, SACUL)
+    @has_roles(admin=True, snr=True, mod=True)
     @app_commands.describe(user = "The user to mute", reason = "The reason for muting", 
                            duration="The duration of the mute",
                            image_proof1="The image proof",
@@ -736,6 +726,21 @@ class ModCog(commands.Cog):
         image_proof3: discord.Attachment | None = None
     ):
         await interaction.response.defer(ephemeral=True)
+        if user.top_role >= interaction.user.top_role:
+            embed = discord.Embed(
+                title="Insufficient Permissions",
+                description=f"- You cannot mute a member who's role is higher than or equal to yours.",
+                color=discord.Color.brand_red(),
+            )
+            return await interaction.followup.send(embed=embed)
+        if user.guild_permissions.administrator:
+            embed = discord.Embed(
+                title="Cannot Mute Administrator",
+                description=f"- You cannot mute a member who has administrator permissions.",
+                color=discord.Color.brand_red(),
+            )
+            return await interaction.followup.send(embed=embed)       
+
         td = datetime.timedelta()
         duration_list = [duration for duration in duration.split(",")]
         for duration in duration_list:
@@ -824,7 +829,7 @@ class ModCog(commands.Cog):
         )
         await interaction.followup.send(embed=channel_embed)
 
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         embed = discord.Embed(
             title=f"Muted (`{case_id}`)",
             description=f">>> **User:** {user.mention} ({user.id})\
@@ -845,7 +850,7 @@ class ModCog(commands.Cog):
 
     @app_commands.command(name="unmute", description="Unmute a user from the server")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, *MODERATOR, SACUL)
+    @has_roles(admin=True, snr=True, mod=True)
     @app_commands.describe(user = "The user to unmute", reason = "The reason for unmuting")
     @app_commands.default_permissions(manage_messages=True)
     async def unmute(
@@ -903,7 +908,7 @@ class ModCog(commands.Cog):
         await interaction.followup.send(embed=channel_embed)
 
         case_id = convert_to_base64()
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
         embed = discord.Embed(
             title=f"Unmuted (`{case_id}`)",
             description=f">>> **User:** {user.mention} ({user.id})\
@@ -923,20 +928,18 @@ class ModCog(commands.Cog):
 
 
 
-    @commands.group(name="clean", invoke_without_command=True)
-    @commands.guild_only()
+    @clean_command.command(name="messages", description="Purge messages")
+    @app_commands.guild_only()
+    @app_commands.describe(limit="The number of messages to purge", channel="The channel to purge from")
+    @app_commands.default_permissions(manage_messages=True)
+    @has_roles(admin=True)
     async def clean(
         self,
-        ctx: commands.Context,
-        limit: int,
+        interaction: discord.Interaction,
+        limit: app_commands.Range[int, 1, 800],
         channel: discord.TextChannel | None = None,
     ) -> None:
-        await ctx.message.delete()
-        if limit > 800:
-            embed = discord.Embed(title="Maximum Messages Reached",
-                                  description="- You can only purge up to `800` messages.",
-                                  color=discord.Color.brand_red())
-            return await ctx.send(embed=embed, delete_after=5.0)
+        await interaction.response.defer(ephemeral=True)
 
         def check(msg: discord.Message):
             return (
@@ -944,152 +947,89 @@ class ModCog(commands.Cog):
                 < datetime.timedelta(days=13).total_seconds()
             )
 
-        channel = channel or ctx.channel
+        channel = channel or interaction.channel
         purged = await channel.purge(limit=limit, check=check)
         embed = discord.Embed(
             title=f"✅ Successfully purged `{len(purged)}` messages from {channel.mention}",
             color=discord.Color.brand_green(),
         )
-        await channel.send(embed=embed)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @clean.error
-    async def clean_error(self, ctx: commands.Context, error: commands.CommandError):
-        if isinstance(error, commands.MissingRequiredArgument):
-            embed = discord.Embed(
-                title="Invalid Input",
-                description=f"\n- `!clean [limit] [channel]`",
-                color=discord.Color.brand_red(),
-            )
-        elif isinstance(error, commands.MissingAnyRole):
-            return
-        elif isinstance(error, commands.ChannelNotFound):
-            embed = discord.Embed(
-                title="Channel Not Found",
-                description=f"- `{error.argument}` is not a channel.",
-                color=discord.Color.brand_red(),
-            )
-        else:
-            embed = discord.Embed(
-                title="An Error Occurred",
-                description=f"- {error}\n- Command: `{ctx.message.content}`",
-                color=discord.Color.brand_red(),
-            )
-        await ctx.send(embed=embed)
-
-    @clean.command(name="until")
+    @clean_command.command(name="until", description="Purge messages until a certain message")
     @app_commands.guild_only()
+    @app_commands.describe(until="The message to purge until, use a message link")
+    @app_commands.default_permissions(manage_messages=True)
+    @has_roles(admin=True)
     async def clean_until(
         self,
-        ctx: commands.Context,
+        interaction: discord.Interaction,
         until: str,
-        channel: discord.TextChannel | None = None,
     ):
+        await interaction.response.defer(ephemeral=True)
         def check(msg: discord.Message):
             return (
                 int(time.time() - msg.created_at.timestamp())
                 < datetime.timedelta(days=13).total_seconds()
             )
-
-        channel = channel or ctx.channel
-        if "/" in until:
-            until = until.split("/")[6]
-        new_until = discord.utils.snowflake_time(int(until))
+        try:
+            until_id = until.split("/")[6]
+            channel_id = until.split("/")[5]
+            channel = interaction.guild.get_channel(int(channel_id)) or await interaction.guild.fetch_channel(int(channel_id))
+        except (IndexError, discord.NotFound) as e:
+            raise e
+        new_until = discord.utils.snowflake_time(int(until_id))
         purged = await channel.purge(after=new_until, check=check)
         embed = discord.Embed(
             title=f"✅ Successfully purged `{len(purged)}` messages from {channel.mention}",
             color=discord.Color.brand_green(),
         )
-        await channel.send(embed=embed, delete_after=5)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @clean_until.error
-    async def cleanuntil_error(
-        self, ctx: commands.Context, error: commands.CommandError
-    ):
-        if isinstance(error, commands.MissingRequiredArgument):
-            embed = discord.Embed(
-                title="Invalid Input",
-                description=f"\n- `!clean until [msg] [channel]`",
-                color=discord.Color.brand_red(),
-            )
-        elif isinstance(error, commands.MissingAnyRole):
-            return
-        elif isinstance(error, commands.ChannelNotFound):
-            embed = discord.Embed(
-                title="Channel Not Found",
-                description=f"- `{error.argument}` is not a channel.",
-                color=discord.Color.brand_red(),
-            )
-        else:
-            embed = discord.Embed(
-                title="An Error Occurred",
-                description=f"- {error}\n- Command: `{ctx.message.content}`",
-                color=discord.Color.brand_red(),
-            )
-        await ctx.send(embed=embed)
 
-    @clean.command(name="between")
+    @clean_command.command(name="between", description="Purge between two messages")
     @app_commands.guild_only()
+    @app_commands.describe(first_message="First Message", second_message="Second Message")
+    @app_commands.default_permissions(manage_messages=True)
+    @has_roles(admin=True)
     async def clean_between(
         self,
-        ctx: commands.Context,
-        first_message: str | int,
-        second_message: str | int,
-        channel: discord.TextChannel | None = None,
+        interaction: discord.Interaction,
+        first_message: str,
+        second_message: str,
     ):
-
+        await interaction.response.defer(ephemeral=True)
         def check(msg: discord.Message):
             return (
                 int(time.time() - msg.created_at.timestamp())
                 < datetime.timedelta(days=13).total_seconds()
             )
-
-        if isinstance(first_message, str) and "/" in first_message:
-            first_message = first_message.split("/")[6]
-        if isinstance(second_message, str) and "/" in second_message:
-            second_message = second_message.split("/")[6]
-        start = discord.utils.snowflake_time(int(first_message))
-        end = discord.utils.snowflake_time(int(second_message))
-        channel = channel or ctx.channel
+        try:
+            first_message_id = first_message.split("/")[6]
+            second_message_id = second_message.split("/")[6]
+            channel_id = first_message.split("/")[5]
+            channel_id2 = second_message.split("/")[5]
+            if channel_id != channel_id2:
+                raise ValueError("Channel is not the same")
+            channel = interaction.guild.get_channel(int(channel_id)) or await interaction.guild.fetch_channel(int(channel_id))
+        except (IndexError, discord.NotFound) as e:
+            raise e
+        start = discord.utils.snowflake_time(int(first_message_id))
+        end = discord.utils.snowflake_time(int(second_message_id))
         if start.timestamp() > end.timestamp():
             purged = await channel.purge(after=end, before=start, check=check)
         else:
             purged = await channel.purge(after=start, before=end, check=check)
 
         embed = discord.Embed(
-            title=f"✅ Successfully purged `{len(purged)}` messages from {ctx.channel.mention}",
+            title=f"✅ Successfully purged `{len(purged)}` messages from {channel.mention}",
             color=discord.Color.brand_green(),
         )
-        await channel.send(embed=embed, delete_after=5.0)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @clean_between.error
-    async def cleanbetween_error(
-        self, ctx: commands.Context, error: commands.CommandError
-    ):
-        if isinstance(error, commands.MissingRequiredArgument):
-            embed = discord.Embed(
-                title="Invalid Input",
-                description=f"\n- `!clean between [msg1] [msg2] [channel]`",
-                color=discord.Color.brand_red(),
-            )
-        elif isinstance(error, commands.MissingAnyRole):
-            return
-        elif isinstance(error, commands.ChannelNotFound):
-            embed = discord.Embed(
-                title="Channel Not Found",
-                description=f"- `{error.argument}` is not a channel.",
-                color=discord.Color.brand_red(),
-            )
-        else:
-            embed = discord.Embed(
-                title="An Error Occurred",
-                description=f"- {error}\n- Command: `{ctx.message.content}`",
-                color=discord.Color.brand_red(),
-            )
-        await ctx.send(embed=embed)
 
     @app_commands.command(name="slowmode", description="Set slowmode to a channel")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, SACUL)
+    @has_roles(admin=True)
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(duration="The duration of the slowmode", channel="The channel to set slowmode too")
     async def slowmode(
@@ -1112,7 +1052,7 @@ class ModCog(commands.Cog):
             )
             await interaction.followup.send(embed=channel_embed)
             await channel.edit(slowmode_delay=0)
-            channel = interaction.guild.get_channel(MOD_LOG)
+            channel = interaction.guild.get_channel(self.bot.mod_log)
 
             embed = discord.Embed(
                 title=f"Slowmode disabled in {channel.mention}",
@@ -1167,7 +1107,7 @@ class ModCog(commands.Cog):
         )
         await interaction.followup.send(embed=channel_embed)
         await channel.edit(slowmode_delay=total_seconds)
-        channel = interaction.guild.get_channel(MOD_LOG)
+        channel = interaction.guild.get_channel(self.bot.mod_log)
 
         embed = discord.Embed(
             title=f"Slowmode set in {channel.mention}",
@@ -1181,7 +1121,7 @@ class ModCog(commands.Cog):
 
     @app_commands.command(name="lock", description="Lock a channel")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, SACUL)
+    @has_roles(admin=True)
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(channel="The channel to lock", reason="The reason for locking the channel")
     async def lock(self, interaction: discord.Interaction, channel: discord.abc.GuildChannel | None = None, reason: str = "No reason provided.") -> None:
@@ -1216,7 +1156,7 @@ class ModCog(commands.Cog):
 
     @app_commands.command(name="unlock", description="The reason for unlocking the channel")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, SACUL)
+    @has_roles(admin=True)
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(channel="The channel to unlock", reason="The reason for unlocking the channel")
     async def unlock(self, interaction: discord.Interaction, channel: discord.abc.GuildChannel | None = None, reason: str = "No reason provided.") -> None:
@@ -1252,29 +1192,29 @@ class ModCog(commands.Cog):
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(users="The list of users to kick | Use @user or user ID")
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, SACUL)
+    @has_roles(admin=True, snr=True)
     async def masskick(self, interaction: discord.Interaction, users: str):
+        await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(
             title="Masskick",
             description="Are you sure you want to execute this?",
             color=discord.Color.brand_red(),
         )
-        members_list = []
+        members_list = set()
         for user in users.split():
             if 22 >= len(user) > 17:
                 user_id = int(user.strip("<@>"))
                 member = interaction.guild.get_member(user_id)
                 if member is None:
                     continue
-                members_list.append(member)
-        print(members_list)
-        view = MassView(set(members_list), "masskick", interaction.user.id, interaction)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+                members_list.add(member)
+        view = MassView(members_list, "masskick", interaction.user.id, interaction)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 
     @app_commands.command(name="massban", description="Ban multiple people")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, SACUL)
+    @has_roles(admin=True, snr=True)
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(users="The list of users to ban | Use @user or user ID")
     async def massban(
@@ -1311,7 +1251,7 @@ class ModCog(commands.Cog):
 
     @app_commands.command(name="massmute", description="Mute multiple people")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, SACUL)
+    @has_roles(admin=True, snr=True)
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(users="The list of users to mute | Use @user or user ID")
     async def massmute(self, interaction: discord.Interaction, users: str):
@@ -1321,21 +1261,21 @@ class ModCog(commands.Cog):
             description="Are you sure you want to execute this?",
             color=discord.Color.brand_red(),
         )
-        members_list = []
+        members_list = set()
         for user in users.split():
             if 22 >= len(user) > 17:
                 user_id = int(user.strip("<@>"))
                 member = interaction.guild.get_member(user_id)
                 if member is None:
                     continue
-                members_list.append(member)
-        view = MassView(set(members_list), "massmute", interaction.user.id, interaction)
+                members_list.add(member)
+        view = MassView(members_list, "massmute", interaction.user.id, interaction)
         await interaction.followup.send(embed=embed, view=view)
 
 
     @app_commands.command(name="massunban", description="Unban multiple people")
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, *SENIOR, SACUL)
+    @has_roles(admin=True, snr=True)
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(users="The list of users to unban | Use user ID")
     async def massunban(self, interaction: discord.Interaction, users: str):
@@ -1353,7 +1293,7 @@ class ModCog(commands.Cog):
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.guild_only()
     @app_commands.describe(case_id = "The case ID of the case")
-    @app_commands.checks.has_any_role(*ADMIN, *MODERATOR, *SENIOR, SACUL, *APPEAL_STAFF)
+    @has_roles(admin=True, mod=True, appeal_staff=True)
     async def case(self, interaction: discord.Interaction, case_id: str):
         await interaction.response.defer()
         async with self.bot.mod_pool.acquire() as conn:
@@ -1396,13 +1336,13 @@ class ModCog(commands.Cog):
             embed.set_footer(
                 text=f"Mod: @{mod} ({mod.id})", icon_url=mod.display_avatar.url
             )
-            await interaction.followup.send(embed=embed, view=JumpToCase(log_id))
+            await interaction.followup.send(embed=embed, view=JumpToCase(log_id, self.bot.main_guild_id, self.bot.mod_log))
 
 
     @app_commands.command(name="cases", description="Get the last 30 cases")
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.guild_only()
-    @app_commands.checks.has_any_role(*ADMIN, *MODERATOR, *SENIOR, SACUL, APPEAL_STAFF)
+    @has_roles(admin=True, mod=True, appeal_staff=True)
     async def cases(self, interaction: discord.Interaction):
         await interaction.response.defer()
         async with self.bot.mod_pool.acquire() as conn:
@@ -1434,7 +1374,7 @@ class ModCog(commands.Cog):
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(user = "The user to get cases of")
-    @app_commands.checks.has_any_role(*ADMIN, *MODERATOR, *SENIOR, SACUL, *APPEAL_STAFF)
+    @has_roles(admin=True, mod=True, appeal_staff=True)
     async def caselist_user(self, interaction: discord.Interaction, user: discord.User):
         await interaction.response.defer()
         async with self.bot.mod_pool.acquire() as conn:
@@ -1471,7 +1411,7 @@ class ModCog(commands.Cog):
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(mod = "The user to get cases of")
-    @app_commands.checks.has_any_role(*ADMIN, *MODERATOR, *SENIOR, SACUL, *APPEAL_STAFF)
+    @has_roles(admin=True, mod=True, appeal_staff=True)
     async def caselist_mod(self, interaction: discord.Interaction, mod: discord.User):
         await interaction.response.defer()
         async with self.bot.mod_pool.acquire() as conn:
@@ -1509,7 +1449,7 @@ class ModCog(commands.Cog):
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.describe(case_id = "The case ID of the case to delete")
-    @app_commands.checks.has_any_role(*ADMIN, SACUL)
+    @has_roles(admin=True)
     async def deletecase(self, interaction: discord.Interaction, case_id: str) -> None:
         await interaction.response.defer(ephemeral=True)
         async with self.bot.mod_pool.acquire() as conn:
@@ -1535,7 +1475,7 @@ class ModCog(commands.Cog):
             log_embed.set_footer(
                 text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url
             )
-            channel = interaction.guild.get_channel(MOD_LOG)
+            channel = interaction.guild.get_channel(self.bot.mod_log)
             await channel.send(embed=log_embed)
         else:
             embed = discord.Embed(
@@ -1613,7 +1553,7 @@ class MassBanModal(discord.ui.Modal):
         self.add_item(self.users)
         self.add_item(self.reason)
 
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction[ModBot]):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(
             f"Now attempting to ban the users... This might take a while",
@@ -1673,7 +1613,7 @@ class MassBanModal(discord.ui.Modal):
             await interaction.delete_original_response()
 
         if result.banned:
-            channel = interaction.guild.get_channel(MOD_LOG)
+            channel = interaction.guild.get_channel(interaction.client.mod_log)
             embed = discord.Embed(
                 title=f"Massbanned [{len(result.banned)}]",
                 description=f">>> - {"\n- ".join(banned)}",
@@ -1738,7 +1678,7 @@ class MassMuteModal(discord.ui.Modal):
         self.add_item(self.duration)
         self.add_item(self.reason)
 
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction[ModBot]):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(
             f"Now attempting to mute the users... This might take a while",
@@ -1873,9 +1813,9 @@ class MassMuteModal(discord.ui.Modal):
             await interaction.delete_original_response()
 
         if muted:
-            channel = interaction.guild.get_channel(MOD_LOG)
+            channel = interaction.guild.get_channel(interaction.client.mod_log)
             embed = discord.Embed(
-                title=f"Massmuted [{len(muted)}] | {duration_message}",
+                title=f"Massmuted [{len(muted)}",
                 description=f">>> - {"\n- ".join(muted)}",
                 color=discord.Color.brand_red(),
                 timestamp=discord.utils.utcnow(),
@@ -1883,7 +1823,7 @@ class MassMuteModal(discord.ui.Modal):
             embed.add_field(
                 name=f"Muted by",
                 value=f">>> {interaction.user.mention} ({interaction.user.id})\
-                    \n**Reason:** {reason}",
+                    \n**Duration:** {duration_message}\n**Reason:** {reason}",
                 inline=False,
             )
             embed.set_footer(
@@ -1927,7 +1867,7 @@ class MassUnbanModal(discord.ui.Modal):
         self.add_item(self.users)
         self.add_item(self.reason)
 
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction[ModBot]):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(
             f"Now attempting to unban the users... This might take a while",
@@ -1972,7 +1912,7 @@ class MassUnbanModal(discord.ui.Modal):
             await interaction.delete_original_response()
 
         if unbanned:
-            channel = interaction.guild.get_channel(MOD_LOG)
+            channel = interaction.guild.get_channel(interaction.client.mod_log)
             embed = discord.Embed(
                 title=f"Massunbanned [{len(unbanned)}]",
                 description=f">>> - {"\n- ".join(unbanned)}",
@@ -2000,7 +1940,7 @@ class MassUnbanModal(discord.ui.Modal):
 
 
 class MassKickModal(discord.ui.Modal):
-    def __init__(self, users: list[discord.Member]):
+    def __init__(self, users: set[discord.Member]):
         super().__init__(title="Masskick", timeout=900, custom_id="Masskick")
         self.actual_users = users
         self.users_split = ",".join(str(user.id) for user in users)
@@ -2027,7 +1967,7 @@ class MassKickModal(discord.ui.Modal):
         self.add_item(self.users)
         self.add_item(self.reason)
 
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction[ModBot]):
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(
             f"Now attempting to kick the users... This might take a while",
@@ -2122,7 +2062,7 @@ class MassKickModal(discord.ui.Modal):
             await interaction.delete_original_response()
 
         if kicked:
-            channel = interaction.guild.get_channel(MOD_LOG)
+            channel = interaction.guild.get_channel(interaction.client.mod_log)
             embed = discord.Embed(
                 title=f"Masskicked [{len(kicked)}]",
                 description=f">>> - {"\n- ".join(kicked)}",
@@ -2162,23 +2102,23 @@ class AppealView(discord.ui.View):
 
 
 class PreviousCase(discord.ui.View):
-    def __init__(self, message_id: int):
+    def __init__(self, message_id: int, guild_id: int, mod_log: int):
         super().__init__(timeout=None)
         self.add_item(
             discord.ui.Button(
                 label="Tempban Case",
                 style=discord.ButtonStyle.link,
-                url=f"https://discord.com/channels/{GUILD_ID}/{MOD_LOG}/{message_id}",
+                url=f"https://discord.com/channels/{guild_id}/{mod_log}/{message_id}",
             )
         )
 
 class JumpToCase(discord.ui.View):
-    def __init__(self, log_id: int):
+    def __init__(self, log_id: int, guild_id: int, mod_log: int):
         super().__init__(timeout=None)
         self.add_item(
             discord.ui.Button(
                 label="Jump to Case",
                 style=discord.ButtonStyle.link,
-                url=f"https://discord.com/channels/{GUILD_ID}/{MOD_LOG}/{log_id}",
+                url=f"https://discord.com/channels/{guild_id}/{mod_log}/{log_id}",
             )
         )
