@@ -12,40 +12,13 @@ from typing import TYPE_CHECKING
 from functions import save_to_moddb, double_query, convert_to_base64
 if TYPE_CHECKING:
     from main import ModBot
-from json import loads
-
-REGEX_PATTERN = re.compile(r'https?:\/\/[^\s/$.?#].[^\s]*')
-
-
-from pathlib import Path
-
-BASE_DIR = Path(__file__).parent
-
-# Build full path to the file
-CONFIG_PATH = BASE_DIR / "config.json"
-def load_config():
-    with open(CONFIG_PATH, 'r') as f:
-        data = f.read()
-        return loads(data)
-    
-data = load_config()
-roles_data = data['roles']
-channel_guild_data = data['channel_guild']
-MODERATOR = roles_data['MODERATOR']
-ADMIN = roles_data['ADMIN']
-SACUL = roles_data['SACUL']
-SENIOR = roles_data['SENIOR']
-
-GUILD_ID = channel_guild_data['GUILD_ID']
-MOD_LOG = channel_guild_data['MOD_LOG']
-MEDIA_CATEGORY = channel_guild_data['MEDIA_CATEGORY_ID']
- 
 
 
 class AutomodCog(commands.Cog):
     def __init__(self, bot: ModBot):
         self.bot = bot
         self.last_executed = 0
+        self.regex_pattern = re.compile(r'https?:\/\/[^\s/$.?#].[^\s]*')
 
     def convert_to_base64(self) -> str:
         u = uuid4()
@@ -61,7 +34,7 @@ class AutomodCog(commands.Cog):
     async def message_listener(self, message: discord.Message):
         if message.author.bot:
             return
-        if message.guild.id !=GUILD_ID:
+        if message.guild.id !=self.bot.main_guild_id:
             return
         bucket = self.bot.spam_limit.get_bucket(message)
         retry_after = bucket.update_rate_limit()
@@ -119,7 +92,7 @@ class AutomodCog(commands.Cog):
             except Exception as e:
                 print(f"An error occurred: {e}")
                 return
-            log_channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(self.bot.mod_log)
             case_id = convert_to_base64()
 
             embed = discord.Embed(
@@ -162,7 +135,7 @@ class AutomodCog(commands.Cog):
                 return print(e)
             except Exception as e:
                 return print(f"An error occurred: {e}")
-            log_channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(self.bot.mod_log)
             case_id = convert_to_base64()
 
             embed = discord.Embed(
@@ -205,7 +178,7 @@ class AutomodCog(commands.Cog):
             except Exception as e:
                 print(f"An error occurred: {e}")
                 return
-            log_channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(self.bot.mod_log)
             case_id = convert_to_base64()
             embed = discord.Embed(
                 title=f"Automuted (`{case_id}`) | 5 warns",
@@ -236,7 +209,7 @@ class AutomodCog(commands.Cog):
                     await user.send(embed=user_embed, view=AppealView())
                 except discord.Forbidden:
                     pass
-            log_channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(self.bot.mod_log)
             case_id = convert_to_base64()
 
             embed = discord.Embed(
@@ -253,7 +226,7 @@ class AutomodCog(commands.Cog):
             log_message = await log_channel.send(embed=embed)
             action = "warn"
         else:
-            log_channel = self.bot.get_channel(MOD_LOG)
+            log_channel = self.bot.get_channel(self.bot.mod_log)
 
             embed = discord.Embed(
                 title=f"Automod Spam",
@@ -281,8 +254,8 @@ class AutomodCog(commands.Cog):
 
     @commands.Cog.listener('on_message')
     async def media_listener(self, message: discord.Message):
-        if isinstance(message.channel,  discord.TextChannel) and message.channel.category_id and message.channel.category_id == MEDIA_CATEGORY and not message.author.bot:
-            has_link : str | None = REGEX_PATTERN.search(message.content)
+        if isinstance(message.channel,  discord.TextChannel) and message.channel.category_id and message.channel.category_id == self.bot.media_category_id and not message.author.bot:
+            has_link : str | None = self.regex_pattern.search(message.content)
             if not message.attachments and has_link is None:
                 try:
                     await message.delete()
