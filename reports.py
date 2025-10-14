@@ -4,32 +4,11 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from typing import Optional, TYPE_CHECKING
-from json import loads
 
 from functions import get_field_content, get_user_id_from_avatar
 from paginator import ButtonPaginator
 if TYPE_CHECKING:
     from main import ModBot
-from pathlib import Path
-
-BASE_DIR = Path(__file__).parent
-
-# Build full path to the file
-CONFIG_PATH = BASE_DIR / "config.json"
-def load_config():
-    with open(CONFIG_PATH, 'r') as f:
-        data = f.read()
-        return loads(data)
-
-
-data = load_config()
-roles_data = data['roles']
-channel_guild_data = data['channel_guild']
-
-GUILD_ID = channel_guild_data['GUILD_ID']
-MOD_LOG = channel_guild_data['MOD_LOG']
-SACUL = roles_data['SACUL']
-REPORT_CHANNEL = channel_guild_data['REPORT_CHANNEL']
 
 
 class ReportCog(commands.Cog):
@@ -80,7 +59,7 @@ class ReportCog(commands.Cog):
             report_embed.set_thumbnail(url=member.display_avatar.url)
             report_embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
 
-            report_channel : discord.TextChannel = self.bot.get_channel(REPORT_CHANNEL)
+            report_channel : discord.TextChannel = self.bot.get_channel(self.bot.report_channel)
             await report_channel.send(embed=report_embed, view=AcceptDenyView())
 
             success_embed = discord.Embed(title="Success",
@@ -140,7 +119,7 @@ class ReportCog(commands.Cog):
             report_embed.set_thumbnail(url=message.author.display_avatar.url)
             report_embed.set_footer(text=f"@{interaction.user}", icon_url=interaction.user.display_avatar.url)
 
-            report_channel : discord.TextChannel = self.bot.get_channel(REPORT_CHANNEL)
+            report_channel : discord.TextChannel = self.bot.get_channel(self.bot.report_channel)
             await report_channel.send(embed=report_embed, view=AcceptDenyView())
     
             success_embed = discord.Embed(title="Success",
@@ -173,7 +152,7 @@ class AcceptDenyView(discord.ui.View):
         super().__init__(timeout=None)
     
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.green, custom_id="accept_report")
-    async def accept_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def accept_callback(self, interaction: discord.Interaction[ModBot], button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         embed = interaction.message.embeds[0] # type: ignore
         user_id1 = get_user_id_from_avatar(embed.author.icon_url)
@@ -183,7 +162,7 @@ class AcceptDenyView(discord.ui.View):
             error_embed = discord.Embed(title="An Error Occurred",
                                         description=f"Unable to find the user ID from `{embed.author.icon_url}` and `{embed.thumbnail.url}`\
                                             \n- user_id1: {user_id1}\n- user_id2: {user_id2}\
-                                            \n**Please notify <@{SACUL}>**")
+                                            \n**Please notify <@802167689011134474>**")
             await interaction.followup.send(embed=error_embed, ephemeral=True)
             return
         user_id = user_id1
@@ -233,7 +212,7 @@ class AcceptDenyView(discord.ui.View):
                 await reported_by.send(embed=user_embed)
             except discord.Forbidden:
                 pass
-        log_channel = interaction.guild.get_channel(MOD_LOG)
+        log_channel = interaction.guild.get_channel(interaction.client.mod_log)
         log_embed = discord.Embed(title="Report Accepted",
                                   description=f">>> **User:** {user.mention} ({user.id})\
                                     \n**Created on:** {discord.utils.format_dt(user.created_at, 'f')}\
@@ -276,7 +255,7 @@ class AcceptDenyView(discord.ui.View):
             error_embed = discord.Embed(title="An Error Occurred",
                                         description=f"Unable to find the user ID from `{embed.author.icon_url}` and `{embed.thumbnail.url}`\
                                             \n- user_id1: {user_id1}\n- user_id2: {user_id2}\
-                                            \n**Please notify <@{SACUL}>**")
+                                            \n**Please notify <@802167689011134474>**")
             await interaction.followup.send(embed=error_embed, ephemeral=True)
             return
         user_id = user_id1
@@ -325,7 +304,7 @@ class DenyModal(discord.ui.Modal):
                                                                                                                            required=True))
         self.add_item(self.deny_reason)
         self.embeds : list[discord.Embed] = embeds
-    async def on_submit(self, interaction: discord.Interaction) -> None:
+    async def on_submit(self, interaction: discord.Interaction[ModBot]) -> None:
         await interaction.response.defer(ephemeral=True)
         deny_reason : str = self.deny_reason.component.value # type: ignore
         embed : discord.Embed = self.embeds[0] # type: ignore
@@ -336,7 +315,7 @@ class DenyModal(discord.ui.Modal):
             error_embed = discord.Embed(title="An Error Occurred",
                                         description=f"Unable to find the user ID from `{embed.author.icon_url}` and `{embed.thumbnail.url}`\
                                             \n- user_id1: {user_id1}\n- user_id2: {user_id2}\
-                                            \n**Please notify <@{SACUL}>**")
+                                            \n**Please notify <@802167689011134474>**")
             await interaction.followup.send(embed=error_embed, ephemeral=True)
             return
         user_id = user_id1
@@ -391,7 +370,7 @@ class DenyModal(discord.ui.Modal):
             except discord.Forbidden as e:
                 pass
     
-        log_channel = interaction.guild.get_channel(MOD_LOG)
+        log_channel = interaction.guild.get_channel(interaction.client.mod_log)
         log_embed = discord.Embed(title="Report Denied",
                                  description=f">>> **User: **{user.mention} ({user.id})\
                                     \n**Created on:** {discord.utils.format_dt(user.created_at, 'f')}\
