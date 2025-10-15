@@ -97,7 +97,7 @@ class Utilities(commands.Cog):
     ) -> None:
         if reaction.is_custom_emoji() and isinstance(reaction.emoji, discord.Emoji):
             if (
-                reaction.emoji.id == self.bot.custom_emoji_id
+                reaction.emoji.id in self.bot.custom_emoji_ids
                 and reaction.message.id not in self.already_added
                 and reaction.count == 3
             ):
