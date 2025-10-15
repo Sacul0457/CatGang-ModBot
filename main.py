@@ -125,7 +125,7 @@ class ModBot(commands.Bot):
         self.sticky_channel = channel_guild_data['STICKY_CHANNEL']
         self.catboard = channel_guild_data['CATBOARD']
         self.reply_emoji_id = channel_guild_data['REPLY_EMOJI_ID']
-        self.custom_emoji_id = channel_guild_data['CUSTOM_EMOJI_ID']
+        self.custom_emoji_ids = channel_guild_data['CUSTOM_EMOJI_IDS']
         self.sticky_channels: list[int] = channel_guild_data['STICKY_CHANNELS']
 
 
